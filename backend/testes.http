@@ -1,0 +1,5 @@
+###
+GET http://localhost:3000/agendamentos/11144477735
+
+###
+DELETE http://localhost:3000/agendamentos/COLE_O_ID_AQUI
