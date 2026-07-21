@@ -1,0 +1,37 @@
+body {
+  font-family: Arial, sans-serif;
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+h1 {
+  color: #1f4e79;
+}
+
+select, input, button {
+  display: block;
+  margin: 10px 0;
+  padding: 8px;
+  width: 100%;
+  font-size: 16px;
+}
+
+#listaAgendamentos {
+  list-style: none;
+  padding: 0;
+}
+
+#listaAgendamentos li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #ddd;
+}
+
+#listaAgendamentos button {
+  display: inline;
+  width: auto;
+  margin: 0 0 0 10px;
+}
