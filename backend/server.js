@@ -1,7 +1,10 @@
 const express = require('express');
-const app = express();
+const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+
+const app = express();
+app.use(cors());
 
 function validarCPF(cpf) {
   cpf = cpf.replace(/[^\d]/g, '');
@@ -35,27 +38,6 @@ app.get('/especialidades', (req, res) => {
   const arquivo = path.join(__dirname, 'data', 'profissionais.json');
   const dados = JSON.parse(fs.readFileSync(arquivo, 'utf-8'));
   res.json(dados.especialidades);
-});
-
-app.get('/profissionais', (req, res) => {
-  const arquivo = path.join(__dirname, 'data', 'profissionais.json');
-  const dados = JSON.parse(fs.readFileSync(arquivo, 'utf-8'));
-  const especialidade = req.query.especialidade;
-
-  if (especialidade) {
-    const filtrados = dados.profissionais.filter(p => p.especialidade === especialidade);
-    res.json(filtrados);
-  } else {
-    res.json(dados.profissionais);
-  }
-});
-
-app.get('/profissionais/busca', (req, res) => {
-  const arquivo = path.join(__dirname, 'data', 'profissionais.json');
-  const dados = JSON.parse(fs.readFileSync(arquivo, 'utf-8'));
-  const nome = (req.query.nome || '').toLowerCase();
-  const encontrados = dados.profissionais.filter(p => p.nome.toLowerCase().includes(nome));
-  res.json(encontrados);
 });
 
 app.get('/profissionais', (req, res) => {
@@ -120,6 +102,19 @@ app.post('/agendamentos', (req, res) => {
   const agendamentos = JSON.parse(fs.readFileSync(arqAgend, 'utf-8'));
 
   const id = Number(profissionalId);
+
+  const arqProf = path.join(__dirname, 'data', 'profissionais.json');
+const dadosProf = JSON.parse(fs.readFileSync(arqProf, 'utf-8'));
+const profissional = dadosProf.profissionais.find(p => p.id === id);
+
+if (!profissional) {
+  return res.status(404).json({ erro: 'Profissional não encontrado' });
+}
+
+const horarioExiste = profissional.horarios.some(h => h.data === data && h.hora === hora);
+if (!horarioExiste) {
+  return res.status(400).json({ erro: 'Este horário não existe na agenda do profissional' });
+}
 
   // 3. Confere se o horário já está ocupado
   const jaOcupado = agendamentos.some(a =>
