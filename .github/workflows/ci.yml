@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+      - run: npx prisma generate
+      # `prisma` é peer dependency opcional de @prisma/client: um `npm audit
+      # --omit=dev` isolado ainda o conta (e a árvore dele tem 3 altas via
+      # deepmerge-ts). O deploy real usa `npm ci --omit=dev --omit=optional`
+      # (ver docker-compose/README de deploy), então auditamos com as mesmas
+      # flags para refletir o que realmente vai pra produção.
+      - run: npm audit --omit=dev --omit=optional
+      - run: npm test

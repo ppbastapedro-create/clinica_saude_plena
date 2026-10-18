@@ -1,0 +1,13 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Os modelos (Usuario, Session, Paciente, Consentimento, Agendamento,
+// RegistroSessao, Pagamento, LogAcesso) e a migração inicial — incluindo a
+// exclusion constraint que impede sobreposição de horários — entram no
+// pacote 1.4.2, conforme o desenho aprovado na Etapa 1.
