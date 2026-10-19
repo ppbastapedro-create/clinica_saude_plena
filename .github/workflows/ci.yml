@@ -28,6 +28,9 @@ jobs:
     env:
       # Banco isolado do service container — nunca o de desenvolvimento.
       DATABASE_URL: postgresql://saude_plena:saude_plena@localhost:5432/saude_plena_test?schema=public
+      # Segredo só de teste (o CI não guarda sessão real nenhuma); produção usa
+      # um valor próprio, configurado no Render.
+      SESSION_SECRET: segredo-apenas-para-testes-do-ci-0123456789abcdef
     steps:
       - uses: actions/checkout@v4
 

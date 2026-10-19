@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrar — Saúde Plena</title>
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <main class="cartao">
+    <h1>Saúde Plena</h1>
+
+    <!-- As duas seções começam ocultas: o login.js pergunta ao backend
+         (/auth/me) se já existe sessão e mostra a certa. -->
+    <section id="secao-login" hidden>
+      <form id="form-login" novalidate>
+        <label for="email">E-mail</label>
+        <input id="email" name="email" type="email" autocomplete="username" required>
+
+        <label for="senha">Senha</label>
+        <input id="senha" name="senha" type="password" autocomplete="current-password" required>
+
+        <p id="erro" class="erro" role="alert" hidden></p>
+
+        <button id="botao-entrar" type="submit">Entrar</button>
+      </form>
+    </section>
+
+    <section id="secao-logado" hidden>
+      <p id="saudacao"></p>
+      <button id="botao-sair" type="button">Sair</button>
+    </section>
+  </main>
+
+  <!-- Script em arquivo separado: o Helmet (CSP) bloqueia <script> inline. -->
+  <script src="login.js"></script>
+</body>
+</html>

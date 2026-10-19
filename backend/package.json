@@ -12,7 +12,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "db:test:migrate": "node scripts/migrate-test.js",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "usuario:criar": "node scripts/criar-usuario.js"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

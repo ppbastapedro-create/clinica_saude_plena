@@ -7,6 +7,9 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   TZ: z.string().default('America/Sao_Paulo'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatório'),
+  // Assina o cookie de sessão: quem souber o segredo consegue forjar cookies
+  // válidos. 32 bytes aleatórios em hex = 64 caracteres.
+  SESSION_SECRET: z.string().min(32, 'SESSION_SECRET precisa de pelo menos 32 caracteres'),
 });
 
 const resultado = schema.safeParse(process.env);
