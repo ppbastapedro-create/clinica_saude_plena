@@ -35,10 +35,26 @@ primeiro agenda, pacientes e autenticação.
 - Ambiente: Windows, VS Code, terminal PowerShell (atenção: `curl` no PowerShell é
   `Invoke-WebRequest`, sintaxe diferente; testes de API feitos pela extensão REST Client via
   arquivo `testes.http`).
-- Node v24.15.0 instalado. Docker Desktop **não funciona no PC do autor** (2026-10-18):
-  em dev local usa-se PostgreSQL 16 nativo do Windows na porta 5433 (mesma dos `.env`);
-  alternativa na nuvem é o GitHub Codespaces (`.devcontainer/`, Postgres em `db:5432`).
-  O `docker-compose.yml` da raiz continua valendo para quem tiver Docker.
+- Node v24.15.0 instalado. Docker Desktop **não funciona no PC do autor** (2026-10-18).
+- **Ambientes de banco.** São dois, com porta, usuário e versão diferentes de propósito.
+  **Não unificar.** Os `.env.example` seguem o ambiente Docker/CI; o `.env` do PC do autor é
+  ajustado à mão.
+  - **Docker/CI** (o que está nos arquivos):
+    - `docker-compose.yml` da raiz: `postgres:16-alpine`, host `localhost:5433` (porta
+      `POSTGRES_PORT` do `.env` da raiz; dentro do container, 5432), usuário `saude_plena`.
+      Bancos `saude_plena` e `saude_plena_test` (este criado por `db/init/` na 1ª subida
+      do volume).
+    - Devcontainer/Codespaces (`.devcontainer/`): `postgres:16`, host `db:5432`, usuário
+      `saude_plena`; o `post-create.sh` gera os `.env` trocando `localhost:5433` por
+      `db:5432`. O seed aceita o host `db` sem precisar de `SEED_ALLOW=1`.
+    - CI (`.github/workflows/ci.yml`): service container `postgres:16`, host
+      `localhost:5432`, usuário `saude_plena`, só o banco `saude_plena_test`.
+  - **Windows local (PC do autor):** PostgreSQL **18** nativo (serviço
+    `postgresql-x64-18`), host `localhost:5432`, usuário `app_saude_plena` (dono dos bancos
+    `saude_plena` e `saude_plena_test`, com `CREATEDB` para o shadow database do
+    `prisma migrate dev`).
+  - Atenção à diferença de versão: o CI testa no Postgres 16 e o PC do autor roda o 18. O
+    que passa local precisa passar no CI antes de ser considerado pronto.
 - O autor está aprendendo: explicar o "porquê" das decisões, não só entregar código.
 - Nunca usar dados reais de pacientes em testes/seeds — só dados fictícios.
 - Segredos sempre em `.env` (nunca commitado); manter `.env.example` atualizado.
@@ -60,7 +76,8 @@ paciente ao sistema.
 - **Backend:** Node.js (LTS) + Express, em camadas (rotas → controllers → services →
   repositórios).
 - **Banco de dados:** PostgreSQL (Supabase, região São Paulo) via **Prisma ORM**, com
-  migrações versionadas. Em desenvolvimento, Postgres local via Docker Compose.
+  migrações versionadas. Em desenvolvimento, Postgres local (ver "Ambientes de banco" em
+  "Restrições do autor").
 - **Autenticação:** bcryptjs (puro JS — evita compilar módulo nativo no Windows) +
   express-session + connect-pg-simple (cookie HttpOnly, Secure, SameSite).
 - **Segurança:** Helmet, express-rate-limit, validação com Zod, AES-256-GCM (módulo `crypto`
@@ -74,24 +91,45 @@ paciente ao sistema.
 
 ## Modelo de dados (alvo, aprovado na Etapa 1)
 
-Entidades: `Usuario` (a psicóloga), `Session` (tabela do `connect-pg-simple`, declarada no
+Entidades: `Usuario` (psicólogo ou administrador — ver papéis abaixo), `Session` (tabela do `connect-pg-simple`, declarada no
 schema para o Prisma não acusar drift), `Paciente`, `Consentimento` (1:N com `Paciente`,
 com `revogadoEm` — revogação é direito do titular pela LGPD art. 8º §5º), `Agendamento`,
 `RegistroSessao` (1:1 com `Agendamento`, conteúdo cifrado), `Pagamento` (1:1 com
 `Agendamento`), `LogAcesso` (auditoria de acesso a `RegistroSessao` e eventos de login).
 
-Como a profissional é única, não existem mais as tabelas `especialidades` / `profissionais`
-/ `horarios` do modelo antigo (clínica multiprofissional). Pontos importantes do desenho:
+Não existem mais as tabelas `especialidades` / `profissionais` / `horarios` do modelo
+antigo (clínica multiprofissional). Pontos importantes do desenho:
 
+- **Vários psicólogos no modelo, uma no escopo (decidido em 2026-10-19):** o schema suporta
+  vários psicólogos — `Usuario.papel` (enum `Papel`: `PSICOLOGO`, `ADMIN`), `psicologoId` em
+  `Paciente` e `Agendamento`, `@@unique([psicologoId, cpf])` em `Paciente` e FK composta
+  `Agendamento(pacienteId, psicologoId) → Paciente(id, psicologoId)`, que impede agendar
+  paciente de outro profissional. O escopo atual, porém, entrega para **uma só psicóloga**
+  (a parceira); multiusuário não é requisito de aceite.
+- **Papel `ADMIN`:** gerencia contas de usuário. **Durante o desenvolvimento, o acesso é
+  provisório e total:** as rotas clínicas usam `exigirPapel('PSICOLOGO', 'ADMIN')`.
+  **Antes da implantação**, o `ADMIN` perde acesso a `Paciente`, `RegistroSessao` e
+  `Pagamento` (sigilo profissional — CFP) — as rotas clínicas passam a
+  `exigirPapel('PSICOLOGO')`. O banco não impõe isso (nem impede `psicologoId` de apontar
+  para um `ADMIN`): a checagem de papel fica no service/middleware e **precisa de teste
+  automatizado**.
+- **Integridade referencial:** todas as FKs são `ON DELETE RESTRICT` (coerente com "sem
+  exclusão física"), inclusive as de `LogAcesso` — auditoria não perde o vínculo. A FK
+  composta `Agendamento → Paciente` é também `ON UPDATE RESTRICT`: transferir paciente
+  entre psicólogos deve ser um processo explícito, nunca um cascade silencioso.
+- **Datas:** todos os `DateTime` são `@db.Timestamptz(3)` — precisão de milissegundos, igual
+  ao `Date` do JavaScript, e instante absoluto independente do fuso do servidor.
 - **Sem exclusão física:** `Paciente.arquivadoEm` (arquivamento lógico) substitui
   `DELETE /pacientes/:id`; não existe `DELETE /agendamentos/:id` — cancelar é
   `PATCH .../status` para `CANCELADO`. Motivo: guarda mínima de 5 anos (Resolução CFP
   nº 001/2009).
 - **Conflito de horário não é mais `UNIQUE(data, hora)`.** `Agendamento` guarda
   `inicio`/`fim` como `Timestamptz`, e uma *exclusion constraint* do Postgres
-  (`EXCLUDE USING gist (tstzrange(inicio, fim) WITH &&) WHERE (status <> 'CANCELADO')`,
-  exige a extensão `btree_gist`) impede qualquer sobreposição real de intervalos — não só
-  choque de horário de início exato — e ignora agendamentos cancelados. O Prisma não
+  (`EXCLUDE USING gist ("psicologoId" WITH =, tstzrange(inicio, fim) WITH &&) WHERE
+  (status <> 'CANCELADO')`, exige a extensão `btree_gist` para o `=` em inteiro) impede
+  qualquer sobreposição real de intervalos **do mesmo psicólogo** — não só choque de
+  horário de início exato — e ignora agendamentos cancelados. A coluna é `"psicologoId"`
+  entre aspas porque o Prisma cria as colunas com o nome do campo (camelCase). O Prisma não
   expressa isso: a constraint é SQL manual, acrescentada à migração gerada. O erro
   correspondente é o código Postgres `23P01` (não o `P2002` do Prisma), tratado como 409
   no `errorHandler`. A checagem de conflito também é feita antes, no service (mensagem
@@ -111,6 +149,15 @@ com a exclusion constraint entram no pacote 1.4.2.
 ## Onde paramos
 
 - **Projeto 3 (JSON, clínica multiprofissional):** completo e arquivado — não evolui mais.
+  - **Decisão (2026-10-19, pacote 1.4.2): os dados JSON são descartados, sem script de
+    importação.** Motivo: `backend/data/*.json` só contém dados de teste do Projeto 3, de
+    um modelo incompatível (vários profissionais/especialidades, horários fixos, paciente
+    identificado só por nome+CPF no agendamento) e nenhum dado real da parceira. Na EAP,
+    o pacote "1.4.2 Migração JSON→Postgres" se cumpre com a migração do **modelo** para o
+    Postgres (schema Prisma + migração versionada + seed fictício), não dos registros.
+  - `backend/server.js` e `backend/data/` continuam no repositório só como histórico (o
+    `server.js` não roda mais: depende de `cors`, removido do `package.json`). Remoção
+    física fica para quando o autor decidir — não remover sem avisar.
 - **Saúde Plena (Projeto Integrador de TI):**
   - Etapa 0 (diagnóstico do repositório) — **concluída** em 2026-10-18.
   - Etapa 1 (desenho: estrutura em camadas, `schema.prisma`, lista de endpoints) — em
@@ -119,6 +166,19 @@ com a exclusion constraint entram no pacote 1.4.2.
     cada um: 1.4.1 Infraestrutura → 1.4.2 Migração JSON→Postgres → 1.4.3 Autenticação →
     1.4.4 Pacientes → 1.4.5 Agenda → 1.4.6 Registro de sessões → 1.4.7 Financeiro e
     relatórios → 1.4.8 Lembretes → 1.5.1 Testes → 1.5.2 Segurança (checklist OWASP Top 10).
+  - Anotações para pacotes futuros:
+    - **1.4.3 Autenticação:** configurar o `connect-pg-simple` com
+      `createTableIfMissing: false` — a tabela `session` é criada pela migração do Prisma.
+    - **1.4.5 Agenda:** `psicologoId` vem de `req.session.usuario.id`, **nunca** do corpo
+      da requisição (senão um usuário poderia agendar na agenda de outro).
+    - **1.4.5 Agenda (`errorHandler`):** as violações de `EXCLUDE`/`CHECK` chegam como
+      `PrismaClientUnknownRequestError` **sem `code`** — o `23P01`/`23514` só aparece no
+      texto. Identificar pelo nome da constraint (`Agendamento_sem_sobreposicao_excl` →
+      409; `Agendamento_fim_maior_que_inicio_check` → 422). Nunca devolver `e.message` ao
+      cliente: o `detail` do Postgres inclui os valores da linha.
+    - **1.6.1:** conferir a versão do Postgres no Supabase e alinhar a imagem do CI
+      (`postgres:16` em `.github/workflows/ci.yml`) a ela — o CI deve testar na mesma versão
+      de produção.
   - Cronograma de referência da EAP: desenvolvimento previsto 02/11 a 22/11/2026; testes e
     aceitação 23/11 a 29/11/2026; implantação 30/11 a 06/12/2026.
 
@@ -132,6 +192,8 @@ com a exclusion constraint entram no pacote 1.4.2.
 - Não remover funcionalidade existente sem avisar antes.
 - Ao encontrar erro, mostrar a mensagem completa antes de propor correção.
 - Comentários e mensagens de commit em português.
+- **Nunca executar `git add`, `commit` ou `push`. O desenvolvedor faz os commits.** (Reforçado
+  por regras `deny` em `.claude/settings.json`; o agente só sugere a mensagem de commit.)
 
 ## Critérios de avaliação (para orientar prioridades)
 

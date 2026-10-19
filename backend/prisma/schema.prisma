@@ -7,14 +7,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ── Usuária (psicóloga) ──────────────────────────────────────────────
+// Todos os DateTime usam Timestamptz(3): o Date do JavaScript tem precisão de
+// milissegundos, então guardar microssegundos (6) só criaria uma precisão que
+// a aplicação nunca lê nem escreve; e "tz" grava o instante absoluto,
+// independente do fuso do servidor.
+
+// ── Usuário (psicólogo ou administrador) ─────────────────────────────
+// O sistema suporta vários psicólogos, mas o escopo atual entrega para uma
+// só. ADMIN gerencia contas; durante o desenvolvimento tem acesso provisório
+// total, e antes da implantação perde acesso a Paciente, RegistroSessao e
+// Pagamento — essa checagem de papel fica no service (o banco não a impõe).
+enum Papel {
+  PSICOLOGO
+  ADMIN
+}
+
 model Usuario {
-  id               Int         @id @default(autoincrement())
-  email            String      @unique
+  id               Int           @id @default(autoincrement())
+  nome             String
+  email            String        @unique
   senhaHash        String
-  tentativasFalhas Int         @default(0)
-  bloqueadoAte     DateTime?
-  criadoEm         DateTime    @default(now())
+  papel            Papel         @default(PSICOLOGO)
+  ativo            Boolean       @default(true)
+  tentativasFalhas Int           @default(0)
+  bloqueadoAte     DateTime?     @db.Timestamptz(3)
+  criadoEm         DateTime      @default(now()) @db.Timestamptz(3)
+  pacientes        Paciente[]
+  agendamentos     Agendamento[]
   logsAcesso       LogAcesso[]
 }
 
@@ -25,7 +44,7 @@ model Usuario {
 model Session {
   sid    String   @id @db.VarChar(255)
   sess   Json
-  expire DateTime @db.Timestamp(6)
+  expire DateTime @db.Timestamptz(3)
 
   @@index([expire], map: "IDX_session_expire")
   @@map("session")
@@ -34,14 +53,22 @@ model Session {
 // ── Paciente ──────────────────────────────────────────────────────────
 model Paciente {
   id             Int             @id @default(autoincrement())
+  psicologoId    Int
+  psicologo      Usuario         @relation(fields: [psicologoId], references: [id])
   nome           String
-  cpf            String          @unique
+  cpf            String
   email          String?
   telefone       String?
-  arquivadoEm    DateTime?       // arquivamento lógico — nunca DELETE
-  criadoEm       DateTime        @default(now())
+  arquivadoEm    DateTime?       @db.Timestamptz(3) // arquivamento lógico — nunca DELETE
+  criadoEm       DateTime        @default(now()) @db.Timestamptz(3)
   agendamentos   Agendamento[]
   consentimentos Consentimento[]
+
+  // Mesmo CPF pode existir para psicólogos diferentes (cada um tem sua
+  // carteira de pacientes), mas não duas vezes para o mesmo psicólogo.
+  @@unique([psicologoId, cpf])
+  // Alvo da FK composta de Agendamento (ver abaixo).
+  @@unique([id, psicologoId])
 }
 
 // Histórico de consentimento (LGPD art. 8º, §5º: titular pode revogar)
@@ -50,8 +77,8 @@ model Consentimento {
   pacienteId  Int
   paciente    Paciente  @relation(fields: [pacienteId], references: [id])
   versaoTermo String
-  aceitoEm    DateTime  @default(now())
-  revogadoEm  DateTime?
+  aceitoEm    DateTime  @default(now()) @db.Timestamptz(3)
+  revogadoEm  DateTime? @db.Timestamptz(3)
 
   @@index([pacienteId])
 }
@@ -66,21 +93,27 @@ enum StatusAgendamento {
 
 model Agendamento {
   id                Int               @id @default(autoincrement())
+  psicologoId       Int
+  psicologo         Usuario           @relation(fields: [psicologoId], references: [id])
   pacienteId        Int
-  paciente          Paciente          @relation(fields: [pacienteId], references: [id])
-  inicio            DateTime          @db.Timestamptz(6)
-  fim               DateTime          @db.Timestamptz(6)
+  // FK composta: garante que o paciente pertence ao MESMO psicólogo do
+  // agendamento — o banco recusa agendar paciente de outro profissional.
+  // onUpdate: Restrict — transferir paciente entre psicólogos deve ser um
+  // processo explícito, não um cascade silencioso nos agendamentos.
+  paciente          Paciente          @relation(fields: [pacienteId, psicologoId], references: [id, psicologoId], onUpdate: Restrict)
+  inicio            DateTime          @db.Timestamptz(3)
+  fim               DateTime          @db.Timestamptz(3)
   status            StatusAgendamento @default(AGENDADO)
-  lembreteEnviadoEm DateTime?
+  lembreteEnviadoEm DateTime?         @db.Timestamptz(3)
   registroSessao    RegistroSessao?
   pagamento         Pagamento?
   logsAcesso        LogAcesso[]
-  criadoEm          DateTime          @default(now())
+  criadoEm          DateTime          @default(now()) @db.Timestamptz(3)
+  // Anti-sobreposição por psicólogo (EXCLUDE USING gist) e CHECK (fim > inicio)
+  // são SQL manual acrescentado à migração — o Prisma não expressa nenhum dos dois.
 
   @@index([pacienteId])
-  @@index([inicio])
-  // Anti-sobreposição (EXCLUDE USING gist) e CHECK (fim > inicio) são SQL
-  // manual acrescentado à migração — o Prisma não expressa nenhum dos dois.
+  @@index([psicologoId, inicio])
 }
 
 // ── Registro de sessão (dado sensível — LGPD art. 11) ───────────────
@@ -88,12 +121,12 @@ model RegistroSessao {
   id              Int         @id @default(autoincrement())
   agendamentoId   Int         @unique
   agendamento     Agendamento @relation(fields: [agendamentoId], references: [id])
-  conteudoCifrado Bytes       // AES-256-GCM, AAD = agendamentoId
+  conteudoCifrado Bytes // AES-256-GCM, AAD = agendamentoId
   iv              Bytes
   authTag         Bytes
   versaoChave     Int         @default(1)
-  criadoEm        DateTime    @default(now())
-  atualizadoEm    DateTime    @updatedAt
+  criadoEm        DateTime    @default(now()) @db.Timestamptz(3)
+  atualizadoEm    DateTime    @updatedAt @db.Timestamptz(3)
 }
 
 // ── Pagamento ─────────────────────────────────────────────────────────
@@ -116,7 +149,7 @@ model Pagamento {
   valor          Decimal         @db.Decimal(10, 2)
   status         StatusPagamento @default(PENDENTE)
   formaPagamento FormaPagamento?
-  pagoEm         DateTime?
+  pagoEm         DateTime?       @db.Timestamptz(3)
 }
 
 // ── Auditoria de acesso ──────────────────────────────────────────────
@@ -131,11 +164,13 @@ enum AcaoLog {
 model LogAcesso {
   id            Int          @id @default(autoincrement())
   usuarioId     Int?
-  usuario       Usuario?     @relation(fields: [usuarioId], references: [id])
+  // onDelete: Restrict — o padrão do Prisma para relação opcional é SetNull,
+  // o que apagaria em silêncio o vínculo da trilha de auditoria.
+  usuario       Usuario?     @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
   agendamentoId Int?
-  agendamento   Agendamento? @relation(fields: [agendamentoId], references: [id])
+  agendamento   Agendamento? @relation(fields: [agendamentoId], references: [id], onDelete: Restrict)
   acao          AcaoLog
-  criadoEm      DateTime     @default(now())
+  criadoEm      DateTime     @default(now()) @db.Timestamptz(3)
 
   @@index([agendamentoId])
   @@index([criadoEm])
