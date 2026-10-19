@@ -7,7 +7,136 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Os modelos (Usuario, Session, Paciente, Consentimento, Agendamento,
-// RegistroSessao, Pagamento, LogAcesso) e a migração inicial — incluindo a
-// exclusion constraint que impede sobreposição de horários — entram no
-// pacote 1.4.2, conforme o desenho aprovado na Etapa 1.
+// ── Usuária (psicóloga) ──────────────────────────────────────────────
+model Usuario {
+  id               Int         @id @default(autoincrement())
+  email            String      @unique
+  senhaHash        String
+  tentativasFalhas Int         @default(0)
+  bloqueadoAte     DateTime?
+  criadoEm         DateTime    @default(now())
+  logsAcesso       LogAcesso[]
+}
+
+// ── Sessão HTTP (connect-pg-simple) ──────────────────────────────────
+// Declarada aqui para o Prisma "possuir" a tabela e não acusar drift no
+// próximo `prisma migrate dev`. No connect-pg-simple, usar
+// `createTableIfMissing: false` — quem cria a tabela é esta migração.
+model Session {
+  sid    String   @id @db.VarChar(255)
+  sess   Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "IDX_session_expire")
+  @@map("session")
+}
+
+// ── Paciente ──────────────────────────────────────────────────────────
+model Paciente {
+  id             Int             @id @default(autoincrement())
+  nome           String
+  cpf            String          @unique
+  email          String?
+  telefone       String?
+  arquivadoEm    DateTime?       // arquivamento lógico — nunca DELETE
+  criadoEm       DateTime        @default(now())
+  agendamentos   Agendamento[]
+  consentimentos Consentimento[]
+}
+
+// Histórico de consentimento (LGPD art. 8º, §5º: titular pode revogar)
+model Consentimento {
+  id          Int       @id @default(autoincrement())
+  pacienteId  Int
+  paciente    Paciente  @relation(fields: [pacienteId], references: [id])
+  versaoTermo String
+  aceitoEm    DateTime  @default(now())
+  revogadoEm  DateTime?
+
+  @@index([pacienteId])
+}
+
+// ── Agendamento ───────────────────────────────────────────────────────
+enum StatusAgendamento {
+  AGENDADO
+  REALIZADO
+  FALTA
+  CANCELADO
+}
+
+model Agendamento {
+  id                Int               @id @default(autoincrement())
+  pacienteId        Int
+  paciente          Paciente          @relation(fields: [pacienteId], references: [id])
+  inicio            DateTime          @db.Timestamptz(6)
+  fim               DateTime          @db.Timestamptz(6)
+  status            StatusAgendamento @default(AGENDADO)
+  lembreteEnviadoEm DateTime?
+  registroSessao    RegistroSessao?
+  pagamento         Pagamento?
+  logsAcesso        LogAcesso[]
+  criadoEm          DateTime          @default(now())
+
+  @@index([pacienteId])
+  @@index([inicio])
+  // Anti-sobreposição (EXCLUDE USING gist) e CHECK (fim > inicio) são SQL
+  // manual acrescentado à migração — o Prisma não expressa nenhum dos dois.
+}
+
+// ── Registro de sessão (dado sensível — LGPD art. 11) ───────────────
+model RegistroSessao {
+  id              Int         @id @default(autoincrement())
+  agendamentoId   Int         @unique
+  agendamento     Agendamento @relation(fields: [agendamentoId], references: [id])
+  conteudoCifrado Bytes       // AES-256-GCM, AAD = agendamentoId
+  iv              Bytes
+  authTag         Bytes
+  versaoChave     Int         @default(1)
+  criadoEm        DateTime    @default(now())
+  atualizadoEm    DateTime    @updatedAt
+}
+
+// ── Pagamento ─────────────────────────────────────────────────────────
+enum StatusPagamento {
+  PENDENTE
+  PAGO
+}
+
+enum FormaPagamento {
+  PIX
+  DINHEIRO
+  CARTAO
+  TRANSFERENCIA
+}
+
+model Pagamento {
+  id             Int             @id @default(autoincrement())
+  agendamentoId  Int             @unique
+  agendamento    Agendamento     @relation(fields: [agendamentoId], references: [id])
+  valor          Decimal         @db.Decimal(10, 2)
+  status         StatusPagamento @default(PENDENTE)
+  formaPagamento FormaPagamento?
+  pagoEm         DateTime?
+}
+
+// ── Auditoria de acesso ──────────────────────────────────────────────
+enum AcaoLog {
+  LOGIN
+  LOGIN_FALHO
+  LOGOUT
+  LEITURA_SESSAO
+  ESCRITA_SESSAO
+}
+
+model LogAcesso {
+  id            Int          @id @default(autoincrement())
+  usuarioId     Int?
+  usuario       Usuario?     @relation(fields: [usuarioId], references: [id])
+  agendamentoId Int?
+  agendamento   Agendamento? @relation(fields: [agendamentoId], references: [id])
+  acao          AcaoLog
+  criadoEm      DateTime     @default(now())
+
+  @@index([agendamentoId])
+  @@index([criadoEm])
+}

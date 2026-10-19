@@ -1,0 +1,29 @@
+{
+  // Ambiente de desenvolvimento para GitHub Codespaces (ou "Reopen in
+  // Container" no VS Code): Node + Postgres 16 já prontos, sem instalar nada
+  // na máquina local.
+  "name": "Saúde Plena",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+
+  // Mesma versão de Node do PC do autor e do CI.
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "24.15.0"
+    }
+  },
+
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": { "label": "API Saúde Plena", "onAutoForward": "notify" }
+  },
+
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["Prisma.prisma", "humao.rest-client"]
+    }
+  }
+}

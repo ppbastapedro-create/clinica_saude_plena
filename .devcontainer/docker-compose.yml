@@ -1,0 +1,27 @@
+# Usado só pelo dev container (.devcontainer/devcontainer.json). O
+# docker-compose.yml da raiz continua sendo o do desenvolvimento local.
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/base:bookworm
+    volumes:
+      - ../..:/workspaces:cached
+    # Mantém o container vivo; o servidor é iniciado à mão (npm run dev).
+    command: sleep infinity
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      # Credenciais só de desenvolvimento, iguais às do .env.example.
+      POSTGRES_USER: saude_plena
+      POSTGRES_PASSWORD: saude_plena
+      POSTGRES_DB: saude_plena
+    volumes:
+      - saude_plena_db:/var/lib/postgresql/data
+      # Mesmo script do ambiente local: cria o banco saude_plena_test.
+      - ../db/init:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  saude_plena_db:

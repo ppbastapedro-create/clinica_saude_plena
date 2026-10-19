@@ -3,3 +3,27 @@ GET http://localhost:3000/agendamentos/11144477735
 
 ###
 DELETE http://localhost:3000/agendamentos/COLE_O_ID_AQUI
+
+### Agendamento válido - horário existe na agenda do profissional 1 (deve dar 201)
+POST http://localhost:3000/agendamentos
+Content-Type: application/json
+
+{
+  "nome": "Maria Silva",
+  "cpf": "11144477735",
+  "profissionalId": 1,
+  "data": "2026-08-03",
+  "hora": "10:00"
+}
+
+### Horário inventado - não existe na agenda (deve dar 400)
+POST http://localhost:3000/agendamentos
+Content-Type: application/json
+
+{
+  "nome": "Maria Silva",
+  "cpf": "11144477735",
+  "profissionalId": 1,
+  "data": "2026-08-03",
+  "hora": "23:59"
+}

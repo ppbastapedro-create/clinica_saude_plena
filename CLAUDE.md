@@ -35,7 +35,10 @@ primeiro agenda, pacientes e autenticação.
 - Ambiente: Windows, VS Code, terminal PowerShell (atenção: `curl` no PowerShell é
   `Invoke-WebRequest`, sintaxe diferente; testes de API feitos pela extensão REST Client via
   arquivo `testes.http`).
-- Node v24.15.0 instalado. Docker Desktop necessário (Postgres local para dev).
+- Node v24.15.0 instalado. Docker Desktop **não funciona no PC do autor** (2026-10-18):
+  em dev local usa-se PostgreSQL 16 nativo do Windows na porta 5433 (mesma dos `.env`);
+  alternativa na nuvem é o GitHub Codespaces (`.devcontainer/`, Postgres em `db:5432`).
+  O `docker-compose.yml` da raiz continua valendo para quem tiver Docker.
 - O autor está aprendendo: explicar o "porquê" das decisões, não só entregar código.
 - Nunca usar dados reais de pacientes em testes/seeds — só dados fictícios.
 - Segredos sempre em `.env` (nunca commitado); manter `.env.example` atualizado.
