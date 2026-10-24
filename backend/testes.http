@@ -1,3 +1,257 @@
+# Requisições para a extensão REST Client do VS Code.
+# O REST Client guarda o cookie de sessão entre as requisições deste arquivo:
+# depois do login, as próximas já vão autenticadas.
+#
+# Antes, crie uma conta: npm run usuario:criar (ou npm run db:seed em dev).
+
+@base = http://localhost:3000
+
+### ── Autenticação (1.4.3) ─────────────────────────────────────────────
+
+### Quem está logado? (sem login: 401)
+GET {{base}}/auth/me
+
+### Login (conta do seed; troque se criou outra) — 200 + cookie sp.sid
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "beatriz@exemplo.test",
+  "senha": "trocar-esta-senha"
+}
+
+### Senha errada — 401 genérico. 5 seguidas bloqueiam a conta por 15 min;
+### 10 falhas do mesmo IP em 15 min dão 429.
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "beatriz@exemplo.test",
+  "senha": "senha-errada"
+}
+
+### JSON malformado — 400 { "erro": "JSON inválido" }
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email":
+
+### Logout — 204 (a seguir, /auth/me volta a dar 401)
+POST {{base}}/auth/logout
+
+
+### ── Consultas que NÃO alteram nada (faça o login acima antes) ───────
+
+### Pacientes (situacao=ativos|arquivados|todos; busca=nome ou início do CPF)
+GET {{base}}/pacientes?situacao=todos
+
+### Busca por nome
+GET {{base}}/pacientes?busca=maria
+
+### Detalhe de um paciente
+GET {{base}}/pacientes/1
+
+### Histórico de sessões do paciente (ficha): todas, mais recente primeiro,
+### com as canceladas; cada uma traz temRegistro (sem ler o registro)
+GET {{base}}/pacientes/1/sessoes
+
+### CPF inválido — 400 com { campos: { cpf: [...] } } (nada é gravado)
+POST {{base}}/pacientes
+Content-Type: application/json
+
+{
+  "nome": "Paciente Inválido (fictício)",
+  "cpf": "123.456.789-00"
+}
+
+### Agenda de novembro (data/hora SEMPRE com fuso; sem fuso dá 400)
+GET {{base}}/agendamentos?inicio=2026-11-01T00:00:00-03:00&fim=2026-12-01T00:00:00-03:00
+
+### Agenda de outubro, incluindo as canceladas
+GET {{base}}/agendamentos?inicio=2026-10-01T00:00:00-03:00&fim=2026-11-01T00:00:00-03:00&incluirCancelados=true
+
+
+### ══ ROTEIRO DE VALIDAÇÃO MANUAL (1.4.4 + 1.4.5) ══════════════════════
+### Usa um paciente criado SÓ para o teste — nunca os do seed. Cancelar
+### sessão é irreversível (as transições só saem de AGENDADO), então mexer
+### na Maria do seed estragaria o seed para sempre.
+###
+### Antes de CADA rodada, troque nas variáveis abaixo:
+###   @cpfTeste   → o próximo CPF da lista (cada CPF só cadastra uma vez)
+###   @diaPassado → outro dia no passado (a sessão passada termina
+###                 REALIZADO e continua ocupando aquele horário)
+### @diaFuturo pode repetir: as sessões futuras do roteiro terminam canceladas.
+###
+### CPFs fictícios (válidos só pela conta dos dígitos):
+###   271.828.182-05  314.159.265-90  161.803.398-05  141.421.356-51
+###   173.205.080-52  223.606.797-67  244.948.974-69  264.575.131-82
+###   282.842.712-90
+###
+### Rode os passos EM ORDEM: os ids vêm das respostas anteriores
+### (variáveis de requisição do REST Client, "# @name").
+
+@cpfTeste = 271.828.182-05
+@diaFuturo = 2026-11-20
+@diaPassado = 2026-10-01
+
+### Passo 1 — cadastra o paciente de teste (201; 409 = troque o @cpfTeste)
+# @name pacienteTeste
+POST {{base}}/pacientes
+Content-Type: application/json
+
+{
+  "nome": "Paciente Roteiro (fictício)",
+  "cpf": "{{cpfTeste}}",
+  "email": "roteiro@exemplo.test"
+}
+
+### Passo 2 — marca uma sessão futura (201)
+# @name sessaoFutura
+POST {{base}}/agendamentos
+Content-Type: application/json
+
+{
+  "pacienteId": {{pacienteTeste.response.body.$.id}},
+  "inicio": "{{diaFuturo}}T09:00:00-03:00",
+  "fim": "{{diaFuturo}}T09:50:00-03:00"
+}
+
+### Passo 3 — conflito: sobrepõe a do passo 2 (409, dizendo com quem)
+POST {{base}}/agendamentos
+Content-Type: application/json
+
+{
+  "pacienteId": {{pacienteTeste.response.body.$.id}},
+  "inicio": "{{diaFuturo}}T09:30:00-03:00",
+  "fim": "{{diaFuturo}}T10:20:00-03:00"
+}
+
+### Passo 4 — encostada: começa quando a do passo 2 termina (201)
+# @name sessaoEncostada
+POST {{base}}/agendamentos
+Content-Type: application/json
+
+{
+  "pacienteId": {{pacienteTeste.response.body.$.id}},
+  "inicio": "{{diaFuturo}}T09:50:00-03:00",
+  "fim": "{{diaFuturo}}T10:40:00-03:00"
+}
+
+### Passo 5 — agenda do dia: as duas sessões, em ordem
+GET {{base}}/agendamentos?inicio={{diaFuturo}}T00:00:00-03:00&fim={{diaFuturo}}T23:59:59-03:00
+
+### Passo 6 — remarca a do passo 2 para as 11h (200)
+PUT {{base}}/agendamentos/{{sessaoFutura.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "inicio": "{{diaFuturo}}T11:00:00-03:00",
+  "fim": "{{diaFuturo}}T11:50:00-03:00"
+}
+
+### Passo 7 — sessão no PASSADO, deixada pendente (201)
+# @name sessaoPassada
+POST {{base}}/agendamentos
+Content-Type: application/json
+
+{
+  "pacienteId": {{pacienteTeste.response.body.$.id}},
+  "inicio": "{{diaPassado}}T09:00:00-03:00",
+  "fim": "{{diaPassado}}T09:50:00-03:00"
+}
+
+### Passo 8 — tenta arquivar: 422 listando as 2 sessões futuras
+PATCH {{base}}/pacientes/{{pacienteTeste.response.body.$.id}}/arquivar
+
+### Passo 9a — cancela a sessão remarcada (200)
+PATCH {{base}}/agendamentos/{{sessaoFutura.response.body.$.id}}/status
+Content-Type: application/json
+
+{ "status": "CANCELADO" }
+
+### Passo 9b — cancela a encostada (200)
+PATCH {{base}}/agendamentos/{{sessaoEncostada.response.body.$.id}}/status
+Content-Type: application/json
+
+{ "status": "CANCELADO" }
+
+### Passo 10 — arquiva: agora passa (200), mesmo com a sessão passada pendente
+PATCH {{base}}/pacientes/{{pacienteTeste.response.body.$.id}}/arquivar
+
+### Passo 11 — remarcar a sessão passada de paciente arquivado: 422
+PUT {{base}}/agendamentos/{{sessaoPassada.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "inicio": "{{diaFuturo}}T15:00:00-03:00",
+  "fim": "{{diaFuturo}}T15:50:00-03:00"
+}
+
+### Passo 12 — marcar sessão nova para paciente arquivado: 422
+POST {{base}}/agendamentos
+Content-Type: application/json
+
+{
+  "pacienteId": {{pacienteTeste.response.body.$.id}},
+  "inicio": "{{diaFuturo}}T16:00:00-03:00",
+  "fim": "{{diaFuturo}}T16:50:00-03:00"
+}
+
+### Passo 13 — FECHAR a sessão passada pendente continua permitido (200)
+PATCH {{base}}/agendamentos/{{sessaoPassada.response.body.$.id}}/status
+Content-Type: application/json
+
+{ "status": "REALIZADO" }
+
+### Passo 14 — PUT no paciente arquivado com "arquivadoEm": null: corrige o
+### nome, mas continua arquivado com a MESMA data (compare com o passo 10)
+PUT {{base}}/pacientes/{{pacienteTeste.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "nome": "Paciente Roteiro Corrigido (fictício)",
+  "cpf": "{{cpfTeste}}",
+  "arquivadoEm": null
+}
+
+### ── Registro de sessão (1.4.6) — continua o roteiro ─────────────────
+
+### Passo 15 — ler o registro antes de existir: 404
+GET {{base}}/agendamentos/{{sessaoPassada.response.body.$.id}}/registro
+
+### Passo 16 — grava a evolução da sessão realizada no passo 13 (201).
+### Texto FICTÍCIO — nunca dado real de paciente.
+PUT {{base}}/agendamentos/{{sessaoPassada.response.body.$.id}}/registro
+Content-Type: application/json
+
+{
+  "conteudo": "Registro fictício de teste.\nPaciente relata melhora do sono."
+}
+
+### Passo 17 — lê de volta (200, texto idêntico; cabeçalho Cache-Control: no-store)
+GET {{base}}/agendamentos/{{sessaoPassada.response.body.$.id}}/registro
+
+### Passo 18 — grava de novo: substitui (200, atualizadoEm muda)
+PUT {{base}}/agendamentos/{{sessaoPassada.response.body.$.id}}/registro
+Content-Type: application/json
+
+{
+  "conteudo": "Registro fictício de teste, revisado."
+}
+
+### Passo 19 — sessão CANCELADA não recebe registro: 422
+PUT {{base}}/agendamentos/{{sessaoFutura.response.body.$.id}}/registro
+Content-Type: application/json
+
+{
+  "conteudo": "Não deve ser gravado."
+}
+
+
+### ── Projeto 3 (ARQUIVADO) ───────────────────────────────────────────
+### As rotas abaixo eram do backend/server.js antigo e não existem na API
+### atual. Ficam só como histórico.
+
 ###
 GET http://localhost:3000/agendamentos/11144477735
 

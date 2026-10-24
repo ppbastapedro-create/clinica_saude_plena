@@ -1,78 +1,137 @@
-* {
-  box-sizing: border-box;
+/* Tela de login (mockup, tela 1): painel verde à esquerda, formulário à
+   direita. No celular o painel vira uma faixa no topo. */
+
+.login {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 100vh;
 }
 
-body {
+.login-painel {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 48px;
+  color: #fff;
+  background: var(--verde);
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.marca-logo {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.login-chamada h1 {
+  max-width: 420px;
+  font-size: 34px;
+  letter-spacing: -0.02em;
+}
+
+.login-chamada p {
+  max-width: 380px;
+  margin: 14px 0 0;
+  opacity: 0.88;
+}
+
+.login-selos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
   margin: 0;
-  min-height: 100vh;
+  padding: 0;
+  font-size: 13.5px;
+  list-style: none;
+  opacity: 0.9;
+}
+
+.login-selos li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-selos .icone {
+  width: 16px;
+  height: 16px;
+}
+
+.login-formulario {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background: #f2f5f4;
-  color: #1f2a28;
+  padding: 32px 16px;
 }
 
-.cartao {
+#secao-login {
   width: 100%;
-  max-width: 360px;
-  padding: 32px 24px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  max-width: 352px;
 }
 
-h1 {
-  margin: 0 0 24px;
-  font-size: 1.5rem;
-  text-align: center;
-  color: #2f6f62;
+#secao-login h2 {
+  font-size: 24px;
 }
 
-label {
-  display: block;
-  margin: 12px 0 4px;
-  font-size: 0.9rem;
+.login-subtitulo {
+  margin: 6px 0 20px;
+  color: var(--texto-2);
 }
 
-input {
-  width: 100%;
-  padding: 10px 12px;
-  font-size: 1rem;
-  border: 1px solid #c7d1ce;
-  border-radius: 8px;
+#form-login .rotulo {
+  margin-top: 16px;
 }
 
-input:focus {
-  outline: 2px solid #2f6f62;
-  outline-offset: 1px;
+#erro,
+#aviso-sessao {
+  margin: 18px 0 0;
 }
 
-button {
+#botao-entrar {
   width: 100%;
   margin-top: 20px;
-  padding: 12px;
-  font-size: 1rem;
-  border: none;
-  border-radius: 8px;
-  background: #2f6f62;
-  color: #fff;
-  cursor: pointer;
+  min-height: 44px;
 }
 
-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.erro {
-  margin: 12px 0 0;
-  color: #b3261e;
-  font-size: 0.9rem;
-}
-
-#saudacao {
-  margin: 0;
+.aviso {
+  margin: 16px 0 0;
+  font-size: 12.5px;
   text-align: center;
+  color: var(--texto-2);
+}
+
+@media (max-width: 760px) {
+  .login {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .login-painel {
+    gap: 16px;
+    padding: 20px 16px 24px;
+  }
+
+  .login-chamada h1 {
+    font-size: 22px;
+  }
+
+  .login-chamada p,
+  .login-selos {
+    display: none;
+  }
+
+  .login-formulario {
+    align-items: flex-start;
+  }
 }

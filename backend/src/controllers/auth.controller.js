@@ -37,7 +37,9 @@ async function login(req, res) {
 
 // Idempotente: sem sessão, só confirma (204) e manda apagar o cookie.
 async function logout(req, res) {
+  const usuarioId = req.session?.usuario?.id; // lido antes: destroy apaga a sessão
   await encerrarSessao(req, res);
+  if (usuarioId) await authService.registrarLogout(usuarioId);
   return res.status(204).end();
 }
 

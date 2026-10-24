@@ -4,33 +4,72 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Entrar — Saúde Plena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap">
+  <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="login.css">
 </head>
 <body>
-  <main class="cartao">
-    <h1>Saúde Plena</h1>
+  <div class="login">
+    <aside class="login-painel">
+      <div class="marca">
+        <span class="marca-logo">
+          <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+        </span>
+        Saúde Plena
+      </div>
 
-    <!-- As duas seções começam ocultas: o login.js pergunta ao backend
-         (/auth/me) se já existe sessão e mostra a certa. -->
-    <section id="secao-login" hidden>
-      <form id="form-login" novalidate>
-        <label for="email">E-mail</label>
-        <input id="email" name="email" type="email" autocomplete="username" required>
+      <div class="login-chamada">
+        <h1>Sua agenda e seus registros clínicos, num só lugar.</h1>
+        <p>Agendamentos, evolução das sessões e controle financeiro, com sigilo e criptografia.</p>
+      </div>
 
-        <label for="senha">Senha</label>
-        <input id="senha" name="senha" type="password" autocomplete="current-password" required>
+      <ul class="login-selos">
+        <li>
+          <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Registros criptografados
+        </li>
+        <li>
+          <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+          Conforme a LGPD
+        </li>
+      </ul>
+    </aside>
 
-        <p id="erro" class="erro" role="alert" hidden></p>
+    <main class="login-formulario">
+      <!-- Começa oculto: o login.js pergunta ao backend (/auth/me) se já
+           existe sessão. Se existir, vai direto para o sistema. -->
+      <section id="secao-login" hidden>
+        <h2>Entrar</h2>
+        <p class="login-subtitulo">Acesse com o e-mail e a senha cadastrados.</p>
 
-        <button id="botao-entrar" type="submit">Entrar</button>
-      </form>
-    </section>
+        <p id="aviso-sessao" class="alerta alerta-info" role="status" hidden></p>
 
-    <section id="secao-logado" hidden>
-      <p id="saudacao"></p>
-      <button id="botao-sair" type="button">Sair</button>
-    </section>
-  </main>
+        <form id="form-login" novalidate>
+          <label class="rotulo" for="email">E-mail</label>
+          <input class="campo" id="email" name="email" type="email" autocomplete="username" placeholder="voce@exemplo.com" required>
+
+          <label class="rotulo" for="senha">Senha</label>
+          <input class="campo" id="senha" name="senha" type="password" autocomplete="current-password" required>
+
+          <div id="erro" class="alerta alerta-erro" role="alert" hidden>
+            <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+            <p id="erro-texto"></p>
+          </div>
+
+          <button id="botao-entrar" class="botao botao-primario" type="submit">Entrar</button>
+
+          <!-- Texto fixo, igual para todos: a API continua respondendo o mesmo
+               401 com ou sem bloqueio (não revela quais e-mails têm conta).
+               Os números seguem MAX_TENTATIVAS e BLOQUEIO_MS de
+               backend/src/services/auth.service.js — mudou lá, mude aqui. -->
+          <p class="aviso">Após 5 tentativas incorretas, o acesso fica bloqueado por 15 minutos.<br>
+            Acesso exclusivo da psicóloga responsável.</p>
+        </form>
+      </section>
+    </main>
+  </div>
 
   <!-- Script em arquivo separado: o Helmet (CSP) bloqueia <script> inline. -->
   <script src="login.js"></script>

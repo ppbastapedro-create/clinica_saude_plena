@@ -141,7 +141,17 @@ antigo (clínica multiprofissional). Pontos importantes do desenho:
   CANCELADO`; remarcar (`PUT`) só é permitido com status `AGENDADO`; qualquer outra
   transição retorna 422.
 - Cobrança por falta é configurável, pendente de confirmação com a parceira — não deve ser
-  assumida no código.
+  assumida no código. (Confirmado no 1.4.5: não implementada.)
+- **Regras da agenda confirmadas pelo autor (2026-10-20, pacote 1.4.5):**
+  - Teto de **4 h** por sessão (trava contra erro de digitação, não regra clínica) → 422.
+  - Sessão **no passado é aceita** (lançamento retroativo da agenda de papel).
+  - `REALIZADO`/`FALTA` só depois do **início** da sessão (`inicio <= now()`); `CANCELADO`
+    a qualquer momento.
+  - **Arquivar paciente com sessão futura:** bloqueado com 422 enquanto houver sessão
+    `AGENDADO` com `inicio > now()`; a mensagem lista as datas. Conferência e arquivamento
+    na mesma transação (opção (a), escolhida em vez de cancelar as sessões automaticamente).
+    Sessões **passadas** pendentes de paciente arquivado continuam podendo ser fechadas
+    (`REALIZADO`/`FALTA`/`CANCELADO`).
 
 O `schema.prisma` completo (todas as entidades acima, com os campos e índices) e a migração
 com a exclusion constraint entram no pacote 1.4.2.
@@ -176,6 +186,10 @@ com a exclusion constraint entram no pacote 1.4.2.
       texto. Identificar pelo nome da constraint (`Agendamento_sem_sobreposicao_excl` →
       409; `Agendamento_fim_maior_que_inicio_check` → 422). Nunca devolver `e.message` ao
       cliente: o `detail` do Postgres inclui os valores da linha.
+    - **1.4.8 Lembretes:** o lembrete só considera sessões futuras (`inicio > now()`) com
+      status `AGENDADO` **e de paciente não arquivado** (`paciente.arquivadoEm IS NULL`),
+      independentemente da regra de arquivamento. Sessões no passado são aceitas pela
+      agenda (lançamento retroativo) e nunca devem gerar lembrete.
     - **1.6.1:** conferir a versão do Postgres no Supabase e alinhar a imagem do CI
       (`postgres:16` em `.github/workflows/ci.yml`) a ela — o CI deve testar na mesma versão
       de produção.

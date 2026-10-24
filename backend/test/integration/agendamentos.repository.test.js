@@ -1,5 +1,6 @@
 const prisma = require('../../src/config/prisma');
 const agendamentosRepository = require('../../src/repositories/agendamentos.repository');
+const { emailUnico } = require('../helpers/emailUnico');
 
 // As violações de EXCLUDE, CHECK e RESTRICT chegam como
 // PrismaClientUnknownRequestError, sem `code` — o código Postgres (23P01,
@@ -21,10 +22,10 @@ describe('AgendamentoRepository — constraints de agenda no banco', () => {
 
   beforeAll(async () => {
     psicologa = await prisma.usuario.create({
-      data: { nome: 'Psicóloga Teste (fictícia)', email: 'psicologa.teste@exemplo.test', senhaHash: 'x' },
+      data: { nome: 'Psicóloga Teste (fictícia)', email: emailUnico('psicologa.teste'), senhaHash: 'x' },
     });
     outraPsicologa = await prisma.usuario.create({
-      data: { nome: 'Outra Psicóloga Teste (fictícia)', email: 'outra.teste@exemplo.test', senhaHash: 'x' },
+      data: { nome: 'Outra Psicóloga Teste (fictícia)', email: emailUnico('outra.teste'), senhaHash: 'x' },
     });
     paciente = await prisma.paciente.create({
       data: { psicologoId: psicologa.id, nome: 'Paciente Teste (fictício)', cpf: '11144477735' },

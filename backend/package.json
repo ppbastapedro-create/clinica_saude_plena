@@ -13,7 +13,8 @@
     "prisma:studio": "prisma studio",
     "db:test:migrate": "node scripts/migrate-test.js",
     "db:seed": "node prisma/seed.js",
-    "usuario:criar": "node scripts/criar-usuario.js"
+    "usuario:criar": "node scripts/criar-usuario.js",
+    "usuario:senha": "node scripts/redefinir-senha.js"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

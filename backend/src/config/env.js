@@ -10,6 +10,12 @@ const schema = z.object({
   // Assina o cookie de sessão: quem souber o segredo consegue forjar cookies
   // válidos. 32 bytes aleatórios em hex = 64 caracteres.
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET precisa de pelo menos 32 caracteres'),
+  // Chave AES-256 dos registros de sessão: 32 bytes aleatórios em hex = 64
+  // caracteres. PERDER esta chave = perder todos os registros cifrados com
+  // ela (o backup do banco não basta — guarde a chave à parte, com cuidado).
+  REGISTRO_CHAVE_V1: z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/, 'REGISTRO_CHAVE_V1 deve ter 64 caracteres hexadecimais (32 bytes)'),
 });
 
 const resultado = schema.safeParse(process.env);

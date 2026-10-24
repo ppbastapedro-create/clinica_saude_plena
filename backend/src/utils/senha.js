@@ -10,6 +10,22 @@ const CUSTO_BCRYPT = 12;
 // ignorado em silêncio. Senhas maiores são recusadas na entrada.
 const MAX_BYTES_SENHA = 72;
 
+// Política para senha NOVA (criação/redefinição). Comprimento pesa mais que
+// regras de "tem que ter símbolo": uma frase longa é mais forte e mais fácil
+// de lembrar.
+const MIN_CARACTERES_SENHA = 12;
+
+// Devolve o motivo da recusa, ou null se a senha atende à política.
+function problemaNaSenha(senha) {
+  if (typeof senha !== 'string' || senha.length < MIN_CARACTERES_SENHA) {
+    return `A senha precisa de pelo menos ${MIN_CARACTERES_SENHA} caracteres.`;
+  }
+  if (Buffer.byteLength(senha, 'utf8') > MAX_BYTES_SENHA) {
+    return `A senha pode ter no máximo ${MAX_BYTES_SENHA} bytes.`;
+  }
+  return null;
+}
+
 function gerarHash(senha) {
   return bcrypt.hash(senha, CUSTO_BCRYPT);
 }
@@ -28,4 +44,12 @@ function obterHashFalso() {
   return hashFalso;
 }
 
-module.exports = { gerarHash, compararSenha, obterHashFalso, CUSTO_BCRYPT, MAX_BYTES_SENHA };
+module.exports = {
+  gerarHash,
+  compararSenha,
+  obterHashFalso,
+  problemaNaSenha,
+  CUSTO_BCRYPT,
+  MAX_BYTES_SENHA,
+  MIN_CARACTERES_SENHA,
+};

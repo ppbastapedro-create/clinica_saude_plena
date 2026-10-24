@@ -31,6 +31,9 @@ jobs:
       # Segredo só de teste (o CI não guarda sessão real nenhuma); produção usa
       # um valor próprio, configurado no Render.
       SESSION_SECRET: segredo-apenas-para-testes-do-ci-0123456789abcdef
+      # Chave AES-256 só de teste (64 hex). O CI só cifra dados fictícios do
+      # banco descartável; produção usa uma chave própria, configurada no Render.
+      REGISTRO_CHAVE_V1: 0000000000000000000000000000000000000000000000000000000000000c1c
     steps:
       - uses: actions/checkout@v4
 
