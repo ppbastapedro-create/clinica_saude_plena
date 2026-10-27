@@ -8,6 +8,8 @@ const CAMPOS = {
   cpf: true,
   email: true,
   telefone: true,
+  valorSessao: true,
+  receberLembrete: true,
   arquivadoEm: true,
   criadoEm: true,
 };

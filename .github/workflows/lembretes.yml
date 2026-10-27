@@ -1,0 +1,79 @@
+name: Lembretes
+
+# Envia os lembretes de sessão por e-mail (pacote 1.4.8), de hora em hora.
+# Roda aqui, e não dentro da API, porque no plano gratuito do Render o
+# servidor dorme sem acesso e um agendador interno não dispararia.
+#
+# Secrets necessários (Settings → Secrets and variables → Actions):
+#   DATABASE_URL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_REMETENTE
+# Opcionais: EMAIL_RESPONDER_PARA; e a variável (não secret)
+# LEMBRETE_ANTECEDENCIA_HORAS (padrão 24).
+# NÃO cadastre aqui SESSION_SECRET nem REGISTRO_CHAVE_V1: este job não lê
+# prontuário, e a chave não deve estar onde não é usada.
+#
+# Enquanto DATABASE_URL não estiver cadastrado (antes do deploy), o job só
+# avisa e termina — não falha de hora em hora.
+
+on:
+  schedule:
+    # Minuto 17 de cada hora (UTC). Evita o minuto 0, quando o GitHub
+    # concentra as execuções agendadas e os atrasos são maiores.
+    - cron: '17 * * * *'
+  workflow_dispatch: # botão "Run workflow", para testar à mão
+
+# Duas execuções ao mesmo tempo poderiam mandar o mesmo lembrete duas vezes
+# (o envio vem antes da marcação no banco). A segunda espera a primeira.
+concurrency:
+  group: lembretes
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: production
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+      EMAIL_REMETENTE: ${{ secrets.EMAIL_REMETENTE }}
+      EMAIL_RESPONDER_PARA: ${{ secrets.EMAIL_RESPONDER_PARA }}
+      LEMBRETE_ANTECEDENCIA_HORAS: ${{ vars.LEMBRETE_ANTECEDENCIA_HORAS }}
+    steps:
+      - name: Confere se o deploy já foi configurado
+        id: configurado
+        working-directory: . # antes do checkout, backend/ ainda não existe
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::notice::DATABASE_URL não cadastrado: lembretes desligados até o deploy."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.configurado.outputs.ok == 'true'
+        uses: actions/checkout@v4
+
+      - if: steps.configurado.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - if: steps.configurado.outputs.ok == 'true'
+        run: npm ci
+
+      - if: steps.configurado.outputs.ok == 'true'
+        run: npx prisma generate
+
+      - if: steps.configurado.outputs.ok == 'true'
+        run: npm run lembretes:enviar

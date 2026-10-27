@@ -7,7 +7,7 @@
 import { api, mensagemDe } from './api.js';
 import { el, trocar } from './dom.js';
 import { iniciais, alerta } from './formato.js';
-import { carregando } from './componentes.js';
+import { carregando, botao } from './componentes.js';
 import * as agenda from './telas/agenda.js';
 import * as formAgendamento from './telas/agendamento-form.js';
 import * as detalhe from './telas/agendamento.js';
@@ -130,6 +130,20 @@ async function iniciar() {
   } catch (erro) {
     if (erro.status === 401) return; // o api.js já mandou para o login
     trocar(document.body, el('div', { class: 'falha-inicial' }, alerta('erro', mensagemDe(erro))));
+    return;
+  }
+  // Conta ADMIN não acessa dado clínico (a API responde 403 em tudo): em vez
+  // de telas cheias de erro, uma explicação e o botão de sair.
+  if (usuario.papel !== 'PSICOLOGO') {
+    trocar(
+      document.body,
+      el(
+        'div',
+        { class: 'falha-inicial' },
+        alerta('info', 'Esta conta é de administração. Agenda, pacientes, registros e financeiro são exclusivos da psicóloga (sigilo profissional). Contas são gerenciadas pelos scripts de terminal (npm run usuario:*).'),
+        botao('Sair', { onclick: () => api('/auth/logout', { metodo: 'POST' }).finally(() => window.location.replace('login.html')) }),
+      ),
+    );
     return;
   }
   preencherUsuario();

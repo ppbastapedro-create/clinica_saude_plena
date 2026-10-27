@@ -8,7 +8,7 @@ import { api, mensagemDe } from '../api.js';
 import { el, trocar } from '../dom.js';
 import { icone } from '../icones.js';
 import * as D from '../datas.js';
-import { avatar, alerta, cpfMascarado, emBreve } from '../formato.js';
+import { avatar, alerta, cpfMascarado, reais, lerValor, valorParaCampo } from '../formato.js';
 import { cabecalho, botao, linkVoltar, cartao, linhaInfo } from '../componentes.js';
 import { buscarSessoes } from './agenda.js';
 
@@ -73,7 +73,35 @@ async function montarFormulario(raiz, inicial) {
       estado.paciente = p;
       estado.erroServidor = null;
       atualizarTela();
+      sugerirValor(p);
     });
+  }
+
+  // ── Valor da sessão (só ao marcar; ao remarcar, o valor não muda) ──
+  // Vem preenchido com o preço do paciente (cadastro). Vazio = sessão sem
+  // valor. Entra na conta do paciente quando a sessão for realizada.
+  let valorEditado = false;
+  const campoValor = remarcando
+    ? null
+    : el('input', {
+        class: 'campo',
+        id: 'campo-valor',
+        type: 'text',
+        inputmode: 'decimal',
+        autocomplete: 'off',
+        placeholder: '0,00',
+        oninput: () => {
+          valorEditado = true;
+          estado.erroServidor = null;
+          atualizarTela();
+        },
+      });
+
+  // Troca de paciente: troca a sugestão, a menos que a pessoa já tenha digitado.
+  function sugerirValor(paciente) {
+    if (!campoValor || !paciente || valorEditado) return;
+    campoValor.value = valorParaCampo(paciente.valorSessao);
+    atualizarTela();
   }
 
   // ── Data e duração ──
@@ -145,6 +173,14 @@ async function montarFormulario(raiz, inicial) {
       el('div', { class: 'outro-horario' }, el('span', {}, 'Outro horário:'), campoOutroHorario),
       ajudaHorario,
     ),
+    campoValor &&
+      el(
+        'div',
+        { class: 'grupo grupo-valor' },
+        el('label', { class: 'rotulo', for: 'campo-valor' }, 'Valor da sessão ', el('span', { class: 'opcional' }, '(opcional)')),
+        el('div', { class: 'campo-moeda' }, el('span', {}, 'R$'), campoValor),
+        el('p', { class: 'ajuda' }, 'Sugerido: o preço do paciente (cadastro). Entra na conta dele quando a sessão for realizada.'),
+      ),
     mensagens,
     el('div', { class: 'formulario-acoes' }, botao('Cancelar', { href: voltarPara }), botaoSalvar),
   );
@@ -251,11 +287,29 @@ async function montarFormulario(raiz, inicial) {
           remarcando && linhaInfo('Horário atual', `${D.semanaCurta(ag.inicio)}, ${D.diaMes(ag.inicio)} · ${D.intervalo(ag.inicio, ag.fim)}`),
           linhaInfo(remarcando ? 'Novo dia' : 'Data', `${D.semanaCurta(estado.data)}, ${D.diaMes(estado.data)}`),
           linhaInfo(remarcando ? 'Novo horário' : 'Horário', inicio ? D.intervalo(inicio, fimDe(inicio)) : '—'),
-          el('div', { class: 'linha-info' }, el('span', {}, 'Valor da sessão'), emBreve('1.4.7')),
-          el('div', { class: 'linha-info' }, el('span', {}, 'Lembrete por e-mail'), emBreve('1.4.8')),
+          linhaInfo('Valor da sessão', textoValor()),
+          linhaInfo('Lembrete por e-mail', textoLembrete(inicio)),
         ),
       ),
     );
+  }
+
+  // Ao remarcar, o paciente vem do agendamento (só id e nome, sem o opt-in):
+  // aí não há o que mostrar além de "—".
+  function textoLembrete(inicio) {
+    const recebe = estado.paciente?.receberLembrete;
+    if (recebe === undefined) return '—';
+    if (!recebe) return 'Não (desativado no cadastro)';
+    if (inicio && inicio <= new Date()) return 'Não (sessão no passado)';
+    return 'Sim, cerca de 24 h antes';
+  }
+
+  function textoValor() {
+    if (remarcando) return ag.valor ? `${reais(ag.valor)} (não muda)` : '—';
+    const digitado = campoValor.value.trim();
+    if (!digitado) return '—';
+    const valor = lerValor(digitado);
+    return valor ? reais(valor) : 'valor inválido';
   }
 
   async function salvar(evento) {
@@ -270,7 +324,16 @@ async function montarFormulario(raiz, inicial) {
     try {
       const salvo = remarcando
         ? await api(`/agendamentos/${ag.id}`, { metodo: 'PUT', corpo: intervalo })
-        : await api('/agendamentos', { metodo: 'POST', corpo: { pacienteId: estado.paciente.id, ...intervalo } });
+        : await api('/agendamentos', {
+            metodo: 'POST',
+            corpo: {
+              pacienteId: estado.paciente.id,
+              ...intervalo,
+              // Texto como digitado ("180,50"): o backend valida e normaliza.
+              // Campo vazio = null (sessão sem valor), não "use o preço padrão".
+              valor: campoValor.value.trim() || null,
+            },
+          });
       window.location.hash = `#/agendamentos/${salvo.id}`;
     } catch (erro) {
       estado.enviando = false;
@@ -283,6 +346,7 @@ async function montarFormulario(raiz, inicial) {
   }
 
   await carregarOcupadas();
+  if (!remarcando && estado.paciente) sugerirValor(estado.paciente); // veio da ficha, já com paciente
   return undefined;
 }
 

@@ -94,8 +94,9 @@ paciente ao sistema.
 Entidades: `Usuario` (psicólogo ou administrador — ver papéis abaixo), `Session` (tabela do `connect-pg-simple`, declarada no
 schema para o Prisma não acusar drift), `Paciente`, `Consentimento` (1:N com `Paciente`,
 com `revogadoEm` — revogação é direito do titular pela LGPD art. 8º §5º), `Agendamento`,
-`RegistroSessao` (1:1 com `Agendamento`, conteúdo cifrado), `Pagamento` (1:1 com
-`Agendamento`), `LogAcesso` (auditoria de acesso a `RegistroSessao` e eventos de login).
+`RegistroSessao` (1:1 com `Agendamento`, conteúdo cifrado), `Recebimento` (N:1 com
+`Paciente`; substituiu o `Pagamento` 1:1 — ver "Financeiro" abaixo), `LogAcesso`
+(auditoria de acesso a `RegistroSessao` e eventos de login).
 
 Não existem mais as tabelas `especialidades` / `profissionais` / `horarios` do modelo
 antigo (clínica multiprofissional). Pontos importantes do desenho:
@@ -106,13 +107,13 @@ antigo (clínica multiprofissional). Pontos importantes do desenho:
   `Agendamento(pacienteId, psicologoId) → Paciente(id, psicologoId)`, que impede agendar
   paciente de outro profissional. O escopo atual, porém, entrega para **uma só psicóloga**
   (a parceira); multiusuário não é requisito de aceite.
-- **Papel `ADMIN`:** gerencia contas de usuário. **Durante o desenvolvimento, o acesso é
-  provisório e total:** as rotas clínicas usam `exigirPapel('PSICOLOGO', 'ADMIN')`.
-  **Antes da implantação**, o `ADMIN` perde acesso a `Paciente`, `RegistroSessao` e
-  `Pagamento` (sigilo profissional — CFP) — as rotas clínicas passam a
-  `exigirPapel('PSICOLOGO')`. O banco não impõe isso (nem impede `psicologoId` de apontar
-  para um `ADMIN`): a checagem de papel fica no service/middleware e **precisa de teste
-  automatizado**.
+- **Papel `ADMIN`:** gerencia contas de usuário (pelos scripts `npm run usuario:*`).
+  **Desde o pacote 1.5.2 (2026-10-27) não acessa dado clínico:** as rotas de pacientes,
+  agendamentos/registros, recebimentos e relatórios usam `exigirPapel('PSICOLOGO')`
+  (sigilo profissional — CFP); o frontend mostra ao ADMIN só uma tela explicativa. O
+  banco não impõe isso (nem impede `psicologoId` de apontar para um `ADMIN`): a garantia
+  é o middleware, coberto por `test/integration/acesso.test.js` (403 em toda rota
+  clínica, lida dos arquivos de rotas).
 - **Integridade referencial:** todas as FKs são `ON DELETE RESTRICT` (coerente com "sem
   exclusão física"), inclusive as de `LogAcesso` — auditoria não perde o vínculo. A FK
   composta `Agendamento → Paciente` é também `ON UPDATE RESTRICT`: transferir paciente
@@ -153,6 +154,29 @@ antigo (clínica multiprofissional). Pontos importantes do desenho:
     Sessões **passadas** pendentes de paciente arquivado continuam podendo ser fechadas
     (`REALIZADO`/`FALTA`/`CANCELADO`).
 
+- **Financeiro = conta corrente por paciente (pacote 1.4.7, refeito em 2026-10-25).**
+  O `Pagamento` 1:1 por sessão do desenho original foi **substituído** (migração
+  `20261025120000_financeiro_conta_corrente`): a parceira cobra por pacote (2 ou 4
+  sessões de uma vez, às vezes adiantado), por sessão avulsa, e às vezes não cobra.
+  - `Paciente.valorSessao` (preço padrão, cada paciente tem o seu) → sugerido ao marcar;
+    a sessão guarda o próprio `valor` (mudar o preço não reescreve o histórico).
+  - **Débito** = sessão cobrável: `REALIZADO` cobra e `FALTA` não cobra por padrão;
+    `Agendamento.cobrar` (true/false) inverte, null = padrão. Regra em
+    `agendamentos.service.ehCobravel` **e** em SQL em `agendamentos.repository` (COBRAVEL).
+  - **Crédito** = `Recebimento` (valor, data, forma, nº de sessões informativo). Erro de
+    lançamento é **estornado** (`estornadoEm`), nunca apagado.
+  - Saldo = créditos − débitos: negativo = a receber; positivo = crédito de pacote, que
+    **não vence** (pendente de confirmação com a parceira).
+  - Relatório mensal: "recebido" por **caixa** (data do recebimento, como no caderno da
+    parceira); "atendido" = sessões cobráveis do mês. O "a receber" é o saldo de cada
+    paciente (`GET /relatorios/saldos`), independente do mês.
+  - Valores trafegam como texto com 2 casas (`"180.50"`) e são somados em centavos
+    inteiros (ou pelo banco, em Decimal), nunca em float.
+- **Decisões de 2026-10-25:** área/login do paciente continua **fora do escopo**; a conta
+  oficial da parceira é `PSICOLOGO` (dona de todos os dados dela), criada em
+  **produção** no deploy com `npm run usuario:criar` (senha digitada por ela, nunca no
+  código); dados reais só em produção — o seed fictício continua no desenvolvimento.
+
 O `schema.prisma` completo (todas as entidades acima, com os campos e índices) e a migração
 com a exclusion constraint entram no pacote 1.4.2.
 
@@ -186,10 +210,39 @@ com a exclusion constraint entram no pacote 1.4.2.
       texto. Identificar pelo nome da constraint (`Agendamento_sem_sobreposicao_excl` →
       409; `Agendamento_fim_maior_que_inicio_check` → 422). Nunca devolver `e.message` ao
       cliente: o `detail` do Postgres inclui os valores da linha.
-    - **1.4.8 Lembretes:** o lembrete só considera sessões futuras (`inicio > now()`) com
-      status `AGENDADO` **e de paciente não arquivado** (`paciente.arquivadoEm IS NULL`),
-      independentemente da regra de arquivamento. Sessões no passado são aceitas pela
-      agenda (lançamento retroativo) e nunca devem gerar lembrete.
+    - **1.4.8 Lembretes (implementado em 2026-10-27, decisões do autor):**
+      - Só sessões futuras (`inicio > now()`), `AGENDADO`, de paciente não arquivado,
+        com **opt-in** (`Paciente.receberLembrete`, padrão `false`; CHECK no banco exige
+        e-mail) e de conta de psicólogo ativa. Sessão no passado nunca gera lembrete.
+      - **Disparo pelo GitHub Actions** (`.github/workflows/lembretes.yml`, de hora em
+        hora, `concurrency` impede duas rodadas juntas) rodando `npm run
+        lembretes:enviar` — não `node-cron` na API (o Render gratuito dorme).
+      - Antecedência em `LEMBRETE_ANTECEDENCIA_HORAS` (padrão 24, pendente com a
+        parceira). Envia e só depois marca `lembreteEnviadoEm`, conferindo que a sessão
+        não foi remarcada no meio; remarcar zera o campo.
+      - Sigilo: e-mail só texto, sem "psicologia/terapia/sessão" nem nome da
+        profissional. Log só com ids e códigos de erro (o log do Actions é visível no
+        repositório; a mensagem de erro SMTP repete o destinatário).
+      - Sem `SMTP_HOST`, o Nodemailer usa `jsonTransport` (nada sai; dev/testes). Em
+        `NODE_ENV=production` sem SMTP, o script falha.
+      - `SESSION_SECRET` e `REGISTRO_CHAVE_V1` saíram do schema geral do `env.js`: são
+        validados por `exigirSegredo()` em `session.js`/`cripto.js` (a API continua
+        falhando na subida). Motivo: o job de lembretes **não recebe** a chave do
+        prontuário (menor privilégio).
+    - **1.5.1 Testes (2026-10-27):** piso de 70% (critério da EAP) no `jest.config.js`,
+      global e em `src/services/`; o CI roda `npm run test:cobertura` e publica o HTML
+      como artifact `cobertura`. `test/integration/acesso.test.js` lê todos os
+      `src/routes/*.routes.js` (convenção: `x.routes.js` montado em `/x`) e exige 401
+      sem login / com cookie forjado em toda rota exceto `POST /auth/login|logout` —
+      rota nova entra sozinha. Testes do frontend continuam fora (só backend).
+    - **1.5.2 Segurança (2026-10-27):** checklist em `docs/seguranca-owasp.md`;
+      varredura OWASP ZAP baseline em `.github/workflows/seguranca.yml` (falha com
+      qualquer alerta; risco aceito vai para `.zap/rules.tsv` com justificativa no
+      checklist); Dependabot. Correções: `body-parser` 2.4.0 (alta, DoS), ADMIN sem
+      acesso clínico, CSP sem `unsafe-inline` + `frame-ancestors 'none'`,
+      `Permissions-Policy`, `no-store` em toda a API, frontend do Projeto 3 **apagado**
+      (decisão do autor; `/` redireciona para `/login.html`). O `README.md` ainda
+      descreve o Projeto 3 — atualizar no 1.6.2 (manual).
     - **1.6.1:** conferir a versão do Postgres no Supabase e alinhar a imagem do CI
       (`postgres:16` em `.github/workflows/ci.yml`) a ela — o CI deve testar na mesma versão
       de produção.

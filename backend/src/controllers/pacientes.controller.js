@@ -1,7 +1,7 @@
 const { z } = require('zod');
 const pacientesService = require('../services/pacientes.service');
 const agendamentosService = require('../services/agendamentos.service');
-const { validar, idSchema } = require('../utils/validacao');
+const { validar, idSchema, valorSchema } = require('../utils/validacao');
 const { cpfValido, normalizarCpf } = require('../utils/cpf');
 
 // Campo opcional: formulário costuma mandar "" para campo em branco, e o
@@ -28,12 +28,23 @@ const telefoneSchema = z
 //
 // PUT usa o mesmo schema: substitui o cadastro inteiro. Campo opcional
 // omitido no PUT vira null (apaga o e-mail, por exemplo).
-const pacienteSchema = z.object({
-  nome: z.string().trim().min(2, 'Nome muito curto').max(120, 'Nome muito longo'),
-  cpf: z.string().trim().refine(cpfValido, 'CPF inválido').transform(normalizarCpf),
-  email: opcional(z.string().trim().toLowerCase().pipe(z.email('E-mail inválido').max(254))),
-  telefone: opcional(telefoneSchema),
-});
+const pacienteSchema = z
+  .object({
+    nome: z.string().trim().min(2, 'Nome muito curto').max(120, 'Nome muito longo'),
+    cpf: z.string().trim().refine(cpfValido, 'CPF inválido').transform(normalizarCpf),
+    email: opcional(z.string().trim().toLowerCase().pipe(z.email('E-mail inválido').max(254))),
+    telefone: opcional(telefoneSchema),
+    // Preço padrão da sessão deste paciente (sugerido ao marcar).
+    valorSessao: opcional(valorSchema),
+    // Opt-in do lembrete por e-mail. Omitido = não (também no PUT, como os
+    // demais campos opcionais).
+    receberLembrete: z.boolean().default(false),
+  })
+  // O banco também recusa (CHECK); aqui a mensagem sai no campo certo.
+  .refine((p) => !p.receberLembrete || p.email, {
+    path: ['receberLembrete'],
+    message: 'Para receber lembrete, informe o e-mail do paciente',
+  });
 
 const filtrosSchema = z.object({
   busca: z.string().trim().max(100).optional(),

@@ -1369,6 +1369,214 @@
   color: var(--laranja);
 }
 
+.indicador-recebido > strong {
+  color: var(--verde-escuro);
+}
+
+.avisos-financeiro:not(:empty) {
+  margin-bottom: 18px;
+}
+
+.cartao-tabela > .mensagens {
+  padding: 0 18px 14px;
+}
+
+.tabela-barra .nota {
+  margin: 2px 0 0;
+}
+
+.coluna-numero {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tabela td .selo + .selo,
+.tabela td a + .selo {
+  margin-left: 6px;
+}
+
+.celula-cobranca {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Totais "a receber / créditos" dentro do cartão de saldos */
+.indicadores-saldo {
+  padding: 0 18px 16px;
+  margin: 0;
+}
+
+.indicadores-saldo .indicador {
+  box-shadow: none;
+  background: var(--fundo);
+}
+
+.secao-saldos {
+  margin-bottom: 18px;
+}
+
+.pendencia-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.pendencia-link span:first-child {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+/* ── Conta do paciente (ficha) ── */
+.cartao-conta h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.cartao-conta > .alerta {
+  margin: 10px 0;
+}
+
+.form-recebimento {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--fundo);
+  border-radius: var(--raio);
+}
+
+.form-recebimento h3 {
+  margin: 0;
+}
+
+.extrato {
+  margin-top: 18px;
+}
+
+.extrato ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.extrato li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: center;
+  padding: 9px 0;
+  font-size: 13.5px;
+  border-top: 1px solid var(--borda);
+}
+
+.extrato li > a,
+.extrato li > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  align-items: baseline;
+  min-width: 0;
+  color: var(--texto);
+  text-decoration: none;
+}
+
+.extrato li > a span,
+.extrato li > div span,
+.extrato li small {
+  font-size: 12.5px;
+  color: var(--texto-2);
+}
+
+.extrato li small {
+  flex-basis: 100%;
+}
+
+.extrato-valor {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.extrato-debito .extrato-valor {
+  color: var(--laranja);
+}
+
+.extrato-credito .extrato-valor {
+  color: var(--verde-escuro);
+}
+
+.extrato-saldo {
+  min-width: 96px;
+  font-size: 12.5px;
+  text-align: right;
+  color: var(--texto-2);
+  white-space: nowrap;
+}
+
+.extrato li.estornado .extrato-valor,
+.extrato li.estornado strong {
+  color: var(--texto-3);
+  text-decoration: line-through;
+}
+
+.link-estornar {
+  display: block;
+  margin-left: auto;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--vermelho);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.extrato details summary {
+  padding: 10px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--verde);
+  cursor: pointer;
+}
+
+.coluna-acao {
+  text-align: right;
+}
+
+/* Campo de dinheiro com "R$" fixo à esquerda. */
+.campo-moeda {
+  position: relative;
+}
+
+.campo-moeda > span {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  font-weight: 600;
+  color: var(--texto-2);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.campo-moeda .campo {
+  padding-left: 40px;
+}
+
+.grupo-valor .campo-moeda {
+  max-width: 220px;
+}
+
+.grade-cartoes .grupo + .grupo,
+.grade-cartoes .grupo + .linha-info {
+  margin-top: 12px;
+}
+
+.grade-cartoes .grupo + .acoes-status,
+.grade-cartoes .linha-info + .acoes-status {
+  margin-top: 14px;
+}
+
 /* ── Telas médias ───────────────────────────────────────────────────── */
 @media (max-width: 1080px) {
   .agenda-grade,
@@ -1570,8 +1778,14 @@
     content: attr(data-rotulo);
   }
 
-  .tabela-pacientes td:first-child::before {
+  .tabela-pacientes td:first-child::before,
+  .tabela td.coluna-acao::before {
     content: none;
+  }
+
+  .tabela td.coluna-acao {
+    justify-content: flex-end;
+    padding-top: 8px;
   }
 
   .navegar-mes {
@@ -1602,7 +1816,8 @@
   .fab,
   .cabecalho-acoes .botao,
   .segmentado,
-  .navegar-mes .botao {
+  .navegar-mes .botao,
+  .so-tela {
     display: none !important;
   }
 

@@ -8,7 +8,7 @@ import { api, mensagemDe } from '../api.js';
 import { el, trocar } from '../dom.js';
 import { icone } from '../icones.js';
 import * as D from '../datas.js';
-import { STATUS, seloStatus, avatar, alerta, emBreve } from '../formato.js';
+import { STATUS, seloStatus, avatar, alerta } from '../formato.js';
 import { cabecalho, botao, segmentado, cartao, carregando } from '../componentes.js';
 
 const ALTURA_HORA = 52; // px de uma hora na visão semana
@@ -412,10 +412,19 @@ function vistaMes(sessoes, inicio, fim, referencia, irPara) {
 async function carregarLateral(lateral, subtitulo) {
   const agora = new Date();
   try {
-    const [proximas, recentes] = await Promise.all([
+    const [proximas, recentes, saldos] = await Promise.all([
       buscarSessoes(D.inicioDoDia(agora), D.somarDias(agora, DIAS_PROXIMAS)),
       buscarSessoes(D.somarDias(agora, -DIAS_PENDENCIAS), agora),
+      api('/relatorios/saldos'),
     ]);
+    // Quem está devendo (saldo negativo): linha que leva ao Financeiro.
+    const devendo = saldos.totais.aReceber.pacientes;
+    const saldosPendentes = el(
+      'a',
+      { class: 'pendencia pendencia-fixa pendencia-link', href: '#/financeiro' },
+      el('span', {}, 'Pacientes com saldo a receber'),
+      el('span', { class: `contador${devendo ? ' contador-ativo' : ''}` }, devendo),
+    );
 
     const restantesHoje = proximas.filter((s) => s.status === 'AGENDADO' && D.mesmoDia(s.inicio, agora) && s.fim > agora);
     subtitulo.textContent =
@@ -427,6 +436,7 @@ async function carregarLateral(lateral, subtitulo) {
     const futuras = proximas.filter((s) => s.status === 'AGENDADO' && s.fim > agora).slice(0, 4);
     const aFechar = recentes.filter((s) => s.status === 'AGENDADO' && s.inicio <= agora);
     const semRegistro = recentes.filter((s) => s.status === 'REALIZADO' && !s.temRegistro);
+    const semValor = recentes.filter((s) => s.cobravel && !s.valor);
 
     trocar(
       lateral,
@@ -455,7 +465,8 @@ async function carregarLateral(lateral, subtitulo) {
         { titulo: 'Pendências' },
         pendencia('Sessões a fechar', aFechar, 'Sessões que já começaram e ainda estão como agendadas: marque realizada, falta ou cancelada.'),
         pendencia('Registros a escrever', semRegistro, 'Sessões realizadas ainda sem registro de evolução.', (s) => `#/agendamentos/${s.id}/registro`),
-        el('div', { class: 'pendencia pendencia-fixa' }, el('span', {}, 'Pagamentos pendentes'), emBreve('1.4.7')),
+        pendencia('Sessões sem valor', semValor, 'Sessões cobráveis sem valor definido: ficam fora do saldo do paciente.'),
+        saldosPendentes,
         el('p', { class: 'nota' }, `Considera os últimos ${DIAS_PENDENCIAS} dias.`),
       ),
     );

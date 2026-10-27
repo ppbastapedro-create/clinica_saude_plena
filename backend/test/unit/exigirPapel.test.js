@@ -39,7 +39,7 @@ describe('exigirPapel', () => {
   });
 
   test.each(['PSICOLOGO', 'ADMIN'])(
-    "exigirPapel('PSICOLOGO', 'ADMIN') — regra provisória das rotas clínicas — aceita %s",
+    "com vários papéis, aceita qualquer um deles (%s)",
     (papel) => {
       const { next } = executar(exigirPapel('PSICOLOGO', 'ADMIN'), { id: 1, papel });
       expect(next).toHaveBeenCalledTimes(1);

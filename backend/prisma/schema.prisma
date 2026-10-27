@@ -34,6 +34,7 @@ model Usuario {
   criadoEm         DateTime      @default(now()) @db.Timestamptz(3)
   pacientes        Paciente[]
   agendamentos     Agendamento[]
+  recebimentos     Recebimento[]
   logsAcesso       LogAcesso[]
 }
 
@@ -52,17 +53,27 @@ model Session {
 
 // ── Paciente ──────────────────────────────────────────────────────────
 model Paciente {
-  id             Int             @id @default(autoincrement())
-  psicologoId    Int
-  psicologo      Usuario         @relation(fields: [psicologoId], references: [id])
-  nome           String
-  cpf            String
-  email          String?
-  telefone       String?
-  arquivadoEm    DateTime?       @db.Timestamptz(3) // arquivamento lógico — nunca DELETE
-  criadoEm       DateTime        @default(now()) @db.Timestamptz(3)
-  agendamentos   Agendamento[]
-  consentimentos Consentimento[]
+  id              Int             @id @default(autoincrement())
+  psicologoId     Int
+  psicologo       Usuario         @relation(fields: [psicologoId], references: [id])
+  nome            String
+  cpf             String
+  email           String?
+  telefone        String?
+  // Preço padrão da sessão deste paciente (cada paciente tem o seu). Sugerido
+  // ao marcar; a sessão guarda o próprio valor (mudar o preço não reescreve
+  // o histórico).
+  valorSessao     Decimal?        @db.Decimal(10, 2)
+  // Lembrete de sessão por e-mail só com opt-in (padrão: não): um e-mail de
+  // "lembrete de atendimento" numa caixa compartilhada pode expor que a pessoa
+  // faz terapia. A psicóloga marca quando o paciente concordar. Exige e-mail
+  // (CHECK manual na migração).
+  receberLembrete Boolean         @default(false)
+  arquivadoEm     DateTime?       @db.Timestamptz(3) // arquivamento lógico — nunca DELETE
+  criadoEm        DateTime        @default(now()) @db.Timestamptz(3)
+  agendamentos    Agendamento[]
+  consentimentos  Consentimento[]
+  recebimentos    Recebimento[]
 
   // Mesmo CPF pode existir para psicólogos diferentes (cada um tem sua
   // carteira de pacientes), mas não duas vezes para o mesmo psicólogo.
@@ -104,9 +115,14 @@ model Agendamento {
   inicio            DateTime          @db.Timestamptz(3)
   fim               DateTime          @db.Timestamptz(3)
   status            StatusAgendamento @default(AGENDADO)
+  // Conta corrente do paciente (ver Recebimento): a sessão vira DÉBITO
+  // quando é "cobrável". `cobrar` null = regra padrão pelo status (REALIZADO
+  // cobra; FALTA não cobra — cobrança de falta pendente com a parceira);
+  // true/false = escolha explícita da psicóloga para esta sessão.
+  valor             Decimal?          @db.Decimal(10, 2)
+  cobrar            Boolean?
   lembreteEnviadoEm DateTime?         @db.Timestamptz(3)
   registroSessao    RegistroSessao?
-  pagamento         Pagamento?
   logsAcesso        LogAcesso[]
   criadoEm          DateTime          @default(now()) @db.Timestamptz(3)
   // Anti-sobreposição por psicólogo (EXCLUDE USING gist) e CHECK (fim > inicio)
@@ -129,12 +145,11 @@ model RegistroSessao {
   atualizadoEm    DateTime    @updatedAt @db.Timestamptz(3)
 }
 
-// ── Pagamento ─────────────────────────────────────────────────────────
-enum StatusPagamento {
-  PENDENTE
-  PAGO
-}
-
+// ── Recebimento (conta corrente do paciente) ─────────────────────────
+// Substituiu o Pagamento 1:1 por sessão (pacote 1.4.7, 2026-10-25): a
+// parceira recebe por pacote (2 ou 4 sessões de uma vez, às vezes adiantado)
+// e por sessão avulsa. Saldo do paciente = recebimentos − sessões cobráveis.
+// Negativo = a receber; positivo = crédito (pacote pago e ainda não usado).
 enum FormaPagamento {
   PIX
   DINHEIRO
@@ -142,14 +157,25 @@ enum FormaPagamento {
   TRANSFERENCIA
 }
 
-model Pagamento {
-  id             Int             @id @default(autoincrement())
-  agendamentoId  Int             @unique
-  agendamento    Agendamento     @relation(fields: [agendamentoId], references: [id])
-  valor          Decimal         @db.Decimal(10, 2)
-  status         StatusPagamento @default(PENDENTE)
-  formaPagamento FormaPagamento?
-  pagoEm         DateTime?       @db.Timestamptz(3)
+model Recebimento {
+  id             Int            @id @default(autoincrement())
+  psicologoId    Int
+  psicologo      Usuario        @relation(fields: [psicologoId], references: [id])
+  pacienteId     Int
+  // FK composta, como em Agendamento: só recebe de paciente do mesmo psicólogo.
+  paciente       Paciente       @relation(fields: [pacienteId, psicologoId], references: [id, psicologoId], onUpdate: Restrict)
+  valor          Decimal        @db.Decimal(10, 2)
+  recebidoEm     DateTime       @db.Timestamptz(3)
+  formaPagamento FormaPagamento
+  // Quantas sessões o recebimento cobre (informativo — as "chaves" do
+  // caderno da parceira). O saldo é calculado pelos valores, não por isto.
+  sessoes        Int?
+  // Lançamento errado não é apagado: é estornado (fica no histórico).
+  estornadoEm    DateTime?      @db.Timestamptz(3)
+  criadoEm       DateTime       @default(now()) @db.Timestamptz(3)
+
+  @@index([psicologoId, recebidoEm])
+  @@index([pacienteId])
 }
 
 // ── Auditoria de acesso ──────────────────────────────────────────────

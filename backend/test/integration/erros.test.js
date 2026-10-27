@@ -57,6 +57,18 @@ describe('X-Request-Id', () => {
   });
 });
 
+describe('erros do cliente vindos do Express', () => {
+  test('corpo maior que o limite (100 kB do express.json): 413 com mensagem genérica', async () => {
+    const resposta = await request(app)
+      .post('/auth/login')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ email: 'x@exemplo.test', senha: 'a'.repeat(200_000) }));
+
+    expect(resposta.status).toBe(413);
+    expect(resposta.body).toEqual({ erro: 'Requisição inválida' });
+  });
+});
+
 describe('erro desconhecido (500)', () => {
   test('o corpo traz só `erro` e `requestId` (o mesmo do cabeçalho)', async () => {
     const resposta = await loginQueFalha(erroDoPrisma());

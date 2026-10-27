@@ -2,6 +2,7 @@ const agendamentosRepository = require('../repositories/agendamentos.repository'
 const pacientesRepository = require('../repositories/pacientes.repository');
 const { ErroHttp } = require('../utils/erros');
 const { formatarDiaHora, formatarHora } = require('../utils/datas');
+const { formatarValor } = require('../utils/dinheiro');
 
 // Teto de duração de uma sessão. Não é regra clínica: é uma trava contra
 // erro de digitação (ex.: fim no dia seguinte), que bloquearia a agenda
@@ -14,8 +15,19 @@ const STATUS_FINAIS = ['REALIZADO', 'FALTA', 'CANCELADO'];
 // 404 também para sessão de outra psicóloga: não confirma que o id existe.
 const naoEncontrado = () => new ErroHttp(404, 'Agendamento não encontrado');
 
+// A sessão entra na conta corrente do paciente (vira débito)? Regra padrão
+// pelo status — REALIZADO cobra; FALTA não cobra (cobrança de falta pendente
+// com a parceira); AGENDADO e CANCELADO nunca — e a psicóloga pode inverter
+// para REALIZADO/FALTA com `cobrar` true/false. A mesma regra está em SQL em
+// agendamentos.repository (COBRAVEL) — mudou aqui, mude lá.
+function ehCobravel({ status, cobrar }) {
+  if (status === 'REALIZADO') return cobrar !== false;
+  if (status === 'FALTA') return cobrar === true;
+  return false;
+}
+
 // Formato de saída: o paciente vem só com id e nome; do registro de evolução,
-// só se ele existe.
+// só se ele existe. `valor` é o preço desta sessão ("180.50" ou null).
 function paraResposta(ag) {
   return {
     id: ag.id,
@@ -24,6 +36,10 @@ function paraResposta(ag) {
     status: ag.status,
     paciente: ag.paciente,
     temRegistro: Boolean(ag.registroSessao),
+    valor: formatarValor(ag.valor),
+    cobrar: ag.cobrar,
+    cobravel: ehCobravel(ag),
+    lembreteEnviadoEm: ag.lembreteEnviadoEm,
     criadoEm: ag.criadoEm,
   };
 }
@@ -72,7 +88,7 @@ async function listarDoPaciente(psicologoId, pacienteId) {
 
 // Sessões no passado são aceitas de propósito: permite lançar no sistema os
 // atendimentos que hoje estão na agenda de papel.
-async function criar(psicologoId, { pacienteId, inicio, fim }) {
+async function criar(psicologoId, { pacienteId, inicio, fim, valor }) {
   validarIntervalo({ inicio, fim });
 
   const paciente = await pacientesRepository.buscarPorId(psicologoId, pacienteId);
@@ -85,8 +101,15 @@ async function criar(psicologoId, { pacienteId, inicio, fim }) {
 
   // A conferência de "arquivado" acima é a amigável; esta é a garantida: o
   // repositório trava o paciente e confere de novo antes de inserir (o
-  // arquivamento pode ter acontecido nesse meio-tempo).
-  const criado = await agendamentosRepository.criarParaPacienteAtivo({ psicologoId, pacienteId, inicio, fim });
+  // arquivamento pode ter acontecido nesse meio-tempo). Sem valor no corpo,
+  // a sessão herda o preço padrão do paciente (pode ser null).
+  const criado = await agendamentosRepository.criarParaPacienteAtivo({
+    psicologoId,
+    pacienteId,
+    inicio,
+    fim,
+    valor: valor === undefined ? paciente.valorSessao : valor,
+  });
   if (!criado) throw new ErroHttp(422, 'Paciente arquivado. Reative o cadastro antes de agendar.');
   return paraResposta(criado);
 }
@@ -146,4 +169,15 @@ async function alterarStatus(psicologoId, id, status) {
   return buscar(psicologoId, id);
 }
 
-module.exports = { listar, listarDoPaciente, buscar, criar, remarcar, alterarStatus, DURACAO_MAXIMA_MS };
+// Valor e/ou "cobrar?" da sessão (o que entra na conta do paciente).
+// Qualquer status, menos CANCELADO: o valor pode ser ajustado antes (sessão
+// agendada) e depois (corrigir o preço de uma realizada).
+async function atualizarCobranca(psicologoId, id, dados) {
+  if ((await agendamentosRepository.atualizarCobranca(psicologoId, id, dados)) === 0) {
+    const ag = await buscarEntidade(psicologoId, id); // 404 se não existe / é de outra
+    throw new ErroHttp(422, `Sessão ${ag.status === 'CANCELADO' ? 'cancelada' : ag.status}: a cobrança não pode ser alterada.`);
+  }
+  return buscar(psicologoId, id);
+}
+
+module.exports = { ehCobravel, paraResposta, atualizarCobranca, listar, listarDoPaciente, buscar, criar, remarcar, alterarStatus, DURACAO_MAXIMA_MS };

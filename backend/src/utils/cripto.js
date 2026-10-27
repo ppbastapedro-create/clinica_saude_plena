@@ -24,7 +24,7 @@ const BYTES_TAG = 16;
 // Chaves por versão. A coluna versaoChave guarda com qual chave cada registro
 // foi cifrado; para trocar a chave no futuro, acrescenta-se a V2 aqui, grava
 // com ela e decifra os antigos com a V1 (rotação). Hoje só existe a V1.
-const CHAVES = { 1: Buffer.from(env.REGISTRO_CHAVE_V1, 'hex') };
+const CHAVES = { 1: Buffer.from(env.exigirSegredo('REGISTRO_CHAVE_V1'), 'hex') };
 const VERSAO_ATUAL = 1;
 
 const aadDe = (agendamentoId) => Buffer.from(String(agendamentoId), 'utf8');

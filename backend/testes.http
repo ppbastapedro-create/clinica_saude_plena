@@ -64,6 +64,30 @@ Content-Type: application/json
   "cpf": "123.456.789-00"
 }
 
+### Lembrete sem e-mail — 400 com { campos: { receberLembrete: [...] } }
+POST {{base}}/pacientes
+Content-Type: application/json
+
+{
+  "nome": "Paciente Sem E-mail (fictício)",
+  "cpf": "271.828.182-05",
+  "receberLembrete": true
+}
+
+### Ativa o lembrete por e-mail de um paciente (PUT substitui o cadastro
+### inteiro: mande todos os campos). Depois, no terminal:
+###   npm run lembretes:enviar   (sem SMTP_HOST: só simula)
+PUT {{base}}/pacientes/1
+Content-Type: application/json
+
+{
+  "nome": "Maria Silva (fictícia)",
+  "cpf": "111.444.777-35",
+  "email": "maria.silva@exemplo.test",
+  "valorSessao": "150.00",
+  "receberLembrete": true
+}
+
 ### Agenda de novembro (data/hora SEMPRE com fuso; sem fuso dá 400)
 GET {{base}}/agendamentos?inicio=2026-11-01T00:00:00-03:00&fim=2026-12-01T00:00:00-03:00
 
@@ -246,6 +270,57 @@ Content-Type: application/json
 {
   "conteudo": "Não deve ser gravado."
 }
+
+### ── Financeiro (1.4.7) — continua o roteiro ─────────────────────────
+
+### Conta corrente: sessão cobrável = débito; recebimento = crédito.
+
+### Passo 20 — define o valor da sessão realizada no passo 13 (200; cobravel: true)
+PATCH {{base}}/agendamentos/{{sessaoPassada.response.body.$.id}}/cobranca
+Content-Type: application/json
+
+{ "valor": "87,50" }
+
+### Passo 21 — extrato: cobrado 87,50, saldo -87,50 (a receber)
+GET {{base}}/pacientes/{{pacienteTeste.response.body.$.id}}/financeiro
+
+### Passo 22 — recebe um pacote de 4 sessões (201)
+# @name pacote
+POST {{base}}/pacientes/{{pacienteTeste.response.body.$.id}}/recebimentos
+Content-Type: application/json
+
+{ "valor": "350", "formaPagamento": "PIX", "sessoes": 4 }
+
+### Passo 23 — extrato de novo: saldo +262,50 (crédito de 3 sessões)
+GET {{base}}/pacientes/{{pacienteTeste.response.body.$.id}}/financeiro
+
+### Passo 24 — "não cobrar" a sessão: ela sai da conta (saldo vira +350,00)
+PATCH {{base}}/agendamentos/{{sessaoPassada.response.body.$.id}}/cobranca
+Content-Type: application/json
+
+{ "cobrar": false }
+
+### Passo 25 — recebimento sem forma de pagamento: 400 no campo formaPagamento
+POST {{base}}/pacientes/{{pacienteTeste.response.body.$.id}}/recebimentos
+Content-Type: application/json
+
+{ "valor": "100" }
+
+### Passo 26 — estorna o pacote (lançado por engano): continua no extrato, sai do saldo
+PATCH {{base}}/recebimentos/{{pacote.response.body.$.id}}/estornar
+
+### Passo 27 — sessão CANCELADA: cobrança não pode ser alterada (422)
+PATCH {{base}}/agendamentos/{{sessaoFutura.response.body.$.id}}/cobranca
+Content-Type: application/json
+
+{ "valor": "200" }
+
+### Passo 28 — relatório do mês (troque o mês para o de hoje: o recebimento
+### do passo 22 foi lançado com a data de agora) e painel de saldos
+GET {{base}}/relatorios/mensal?mes=2026-10
+
+###
+GET {{base}}/relatorios/saldos
 
 
 ### ── Projeto 3 (ARQUIVADO) ───────────────────────────────────────────
