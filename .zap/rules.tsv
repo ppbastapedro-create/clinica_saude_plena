@@ -1,0 +1,8 @@
+# Regras do OWASP ZAP (baseline) ajustadas para o Saúde Plena.
+# Formato: id<TAB>IGNORE|INFO|WARN|FAIL<TAB>justificativa
+# Toda regra rebaixada aqui precisa de justificativa e de registro em
+# docs/seguranca-owasp.md. Sem entrada aqui, o alerta falha a execução
+# (fail_action: true no workflow).
+#
+# (Vazio na primeira execução de propósito: o relatório dela é triado e o que
+# for risco aceito entra aqui, com o motivo.)

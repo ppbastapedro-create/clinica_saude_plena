@@ -101,6 +101,8 @@ describe('POST /pacientes', () => {
       cpf: '11144477735',
       email: 'maria.silva@exemplo.test',
       telefone: '61999990000',
+      valorSessao: null,
+      receberLembrete: false,
       arquivadoEm: null,
       criadoEm: expect.any(String),
     });
@@ -184,6 +186,8 @@ describe('POST /pacientes', () => {
       cpf: CPF.maria,
       email: null,
       telefone: null,
+      valorSessao: null,
+      receberLembrete: false,
       arquivadoEm: null,
       criadoEm: expect.any(String),
     });
@@ -541,6 +545,10 @@ describe('GET /pacientes/:id/sessoes', () => {
       status: 'AGENDADO',
       paciente: { id: maria.id, nome: 'Maria' },
       temRegistro: false,
+      valor: null,
+      cobrar: null,
+      cobravel: false,
+      lembreteEnviadoEm: null,
       criadoEm: expect.any(String),
     });
   });

@@ -1,0 +1,20 @@
+# Dependabot (pacote 1.5.2, OWASP A06 — componentes vulneráveis): abre pull
+# request quando sai versão nova ou correção de segurança de uma dependência.
+# O autor revisa e o CI (testes + npm audit) valida antes do merge.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+    # Correções e versões menores num PR só, para não virar uma avalanche de
+    # PRs; versão principal (major) vem separada — pode quebrar algo.
+    groups:
+      menores:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

@@ -8,13 +8,16 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "test": "jest --passWithNoTests",
+    "test:cobertura": "jest --coverage",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "db:test:migrate": "node scripts/migrate-test.js",
     "db:seed": "node prisma/seed.js",
     "usuario:criar": "node scripts/criar-usuario.js",
-    "usuario:senha": "node scripts/redefinir-senha.js"
+    "usuario:senha": "node scripts/redefinir-senha.js",
+    "usuario:email": "node scripts/trocar-email.js",
+    "lembretes:enviar": "node scripts/enviar-lembretes.js"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

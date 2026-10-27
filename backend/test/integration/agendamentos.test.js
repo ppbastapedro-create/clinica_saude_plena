@@ -111,6 +111,10 @@ describe('POST /agendamentos (marcar)', () => {
       status: 'AGENDADO',
       paciente: { id: maria.id, nome: 'Maria (fictícia)' },
       temRegistro: false,
+      valor: null, // paciente sem preço padrão e sem valor no corpo
+      cobrar: null,
+      cobravel: false, // agendada ainda não entra na conta
+      lembreteEnviadoEm: null,
       criadoEm: expect.any(String),
     });
   });

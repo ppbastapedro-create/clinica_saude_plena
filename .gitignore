@@ -2,5 +2,9 @@ node_modules/
 .env
 .env.test
 .vscode/
-.env.example
-.env.test.example
+# Documentos com dados pessoais (termos assinados trazem nome, CPF e
+# assinatura) — nunca no repositório, que é público.
+*assinado*.pdf
+Termo_de_*.pdf
+# Relatório de cobertura dos testes (npm run test:cobertura) — gerado, não versionado.
+coverage/

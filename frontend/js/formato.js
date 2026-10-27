@@ -75,6 +75,41 @@ export function mascararTelefone(texto) {
 
 export const numero = (n) => new Intl.NumberFormat('pt-BR').format(n);
 
+// Dinheiro. A API manda o valor como texto com 2 casas ("180.50"); aqui ele
+// só é formatado para exibir (as contas são feitas no backend, em centavos).
+const fReais = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+export const reais = (valor) => fReais.format(Number(valor));
+
+// "180,50" digitado → "180.50" (ou null se não for um valor válido). Só para
+// a prévia na tela; quem valida de verdade é o backend.
+export function lerValor(texto) {
+  const normalizado = String(texto ?? '').trim().replace(',', '.');
+  return /^\d{1,8}(\.\d{1,2})?$/.test(normalizado) ? Number(normalizado).toFixed(2) : null;
+}
+
+// Valor da API ("180.50") → texto para o campo ("180,50").
+export const valorParaCampo = (valor) => (valor ? valor.replace('.', ',') : '');
+
+export const FORMAS_PAGAMENTO = { PIX: 'PIX', DINHEIRO: 'Dinheiro', CARTAO: 'Cartão', TRANSFERENCIA: 'Transferência' };
+
+// Cobrança de uma sessão nas listas: o valor e, quando for o caso, se ela
+// ficou fora da conta ("não cobrada") ou está sem valor definido.
+export function cobrancaDaSessao(s) {
+  const fechada = s.status === 'REALIZADO' || s.status === 'FALTA';
+  if (s.status === 'CANCELADO') return el('span', { class: 'texto-suave' }, '—');
+  if (fechada && !s.cobravel) return el('span', { class: 'celula-cobranca' }, s.valor ? reais(s.valor) : '', selo('Não cobrada', 'selo-cancelado'));
+  if (s.cobravel && !s.valor) return selo('Sem valor', 'selo-falta');
+  return el('span', {}, s.valor ? reais(s.valor) : '—');
+}
+
+// Saldo da conta corrente: negativo = a receber; positivo = crédito.
+export function seloSaldo(saldo) {
+  const c = Number(saldo);
+  if (c < 0) return selo(`A receber ${reais(-c)}`, 'selo-falta');
+  if (c > 0) return selo(`Crédito ${reais(c)}`, 'selo-agendado');
+  return selo('Em dia', 'selo-cancelado');
+}
+
 // Aviso de funcionalidade prevista na EAP mas ainda sem backend. Mostra o
 // lugar da funcionalidade sem inventar dados.
 export function emBreve(pacote) {

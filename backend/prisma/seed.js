@@ -31,7 +31,7 @@ const prisma = require('../src/config/prisma');
 
 // Agendamento não tem chave única natural (o mesmo horário pode existir
 // cancelado e ativo), então a idempotência é feita buscando antes de criar.
-async function garantirAgendamento({ pagamento, ...dados }) {
+async function garantirAgendamento(dados) {
   const existente = await prisma.agendamento.findFirst({
     where: {
       psicologoId: dados.psicologoId,
@@ -42,9 +42,16 @@ async function garantirAgendamento({ pagamento, ...dados }) {
   });
   if (existente) return existente;
 
-  return prisma.agendamento.create({
-    data: { ...dados, ...(pagamento && { pagamento: { create: pagamento } }) },
+  return prisma.agendamento.create({ data: dados });
+}
+
+// Recebimento também não tem chave natural: cria só se o paciente ainda não
+// tiver nenhum com esse valor nessa data.
+async function garantirRecebimento(dados) {
+  const existente = await prisma.recebimento.findFirst({
+    where: { pacienteId: dados.pacienteId, recebidoEm: dados.recebidoEm, valor: dados.valor },
   });
+  return existente ?? prisma.recebimento.create({ data: dados });
 }
 
 async function garantirPaciente(psicologoId, { cpf, ...dados }) {
@@ -72,19 +79,26 @@ async function main() {
     },
   });
 
+  // Preços fictícios por paciente (cada paciente tem o seu).
   const maria = await garantirPaciente(psicologa.id, {
     nome: 'Maria Silva (fictícia)',
     cpf: '11144477735',
     email: 'maria.silva@exemplo.test',
+    valorSessao: 150,
+    // Com opt-in de lembrete (pacote 1.4.8). Domínio .test não existe: mesmo
+    // com SMTP configurado por engano, nada chega a ninguém.
+    receberLembrete: true,
   });
   const joao = await garantirPaciente(psicologa.id, {
     nome: 'João Pereira (fictício)',
     cpf: '18056488707',
     email: 'joao.pereira@exemplo.test',
+    valorSessao: 200,
   });
   const ana = await garantirPaciente(psicologa.id, {
     nome: 'Ana Costa (fictícia)',
     cpf: '36798214096',
+    valorSessao: 100,
   });
 
   // Um agendamento de cada status, pra exercitar a agenda e os relatórios.
@@ -95,6 +109,7 @@ async function main() {
     inicio: new Date('2026-11-10T14:00:00-03:00'),
     fim: new Date('2026-11-10T14:50:00-03:00'),
     status: 'AGENDADO',
+    valor: 150,
   });
   await garantirAgendamento({
     psicologoId,
@@ -102,12 +117,16 @@ async function main() {
     inicio: new Date('2026-10-10T09:00:00-03:00'),
     fim: new Date('2026-10-10T09:50:00-03:00'),
     status: 'REALIZADO',
-    pagamento: {
-      valor: 200,
-      status: 'PAGO',
-      formaPagamento: 'PIX',
-      pagoEm: new Date('2026-10-10T10:00:00-03:00'),
-    },
+    valor: 200,
+  });
+  // Pacote fictício: João pagou 2 sessões adiantado (fez 1 → fica 1 de crédito).
+  await garantirRecebimento({
+    psicologoId,
+    pacienteId: joao.id,
+    valor: 400,
+    recebidoEm: new Date('2026-10-01T10:00:00-03:00'),
+    formaPagamento: 'PIX',
+    sessoes: 2,
   });
   await garantirAgendamento({
     psicologoId,
@@ -115,6 +134,7 @@ async function main() {
     inicio: new Date('2026-10-12T16:00:00-03:00'),
     fim: new Date('2026-10-12T16:50:00-03:00'),
     status: 'FALTA',
+    valor: 100,
   });
   // Mesmo horário do anterior (16:00–16:50) — prova que um agendamento
   // CANCELADO não conflita com a exclusion constraint.

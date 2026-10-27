@@ -61,12 +61,20 @@ async function redefinirSenha(id, senhaHash) {
   ]);
 }
 
+// A sessão guarda só o id do usuário (o middleware de autenticação relê o
+// resto a cada requisição), então quem está logado continua logado e já vê
+// o e-mail novo — não há sessão a encerrar aqui.
+async function trocarEmail(id, email) {
+  return prisma.usuario.update({ where: { id }, data: { email }, select: CAMPOS_PUBLICOS });
+}
+
 module.exports = {
   buscarParaLogin,
   buscarPorId,
   buscarPorEmail,
   existeEmail,
   redefinirSenha,
+  trocarEmail,
   criar,
   incrementarFalhasLogin,
   bloquearLogin,

@@ -55,4 +55,15 @@ jobs:
       # Aplica as migrações commitadas no banco de teste do service container
       # (sempre começa vazio — não precisa de reset explícito).
       - run: npx prisma migrate deploy
-      - run: npm test
+      # Com cobertura: abaixo do piso do jest.config.js (70%, critério da
+      # EAP), o passo falha e o CI fica vermelho.
+      - run: npm run test:cobertura
+
+      # Relatório HTML da cobertura, baixável na página da execução
+      # (Actions → execução → Artifacts). Evidência para o relatório de testes.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cobertura
+          path: backend/coverage/
+          retention-days: 30

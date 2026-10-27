@@ -1,10 +1,14 @@
 const pacientesRepository = require('../repositories/pacientes.repository');
 const { ErroHttp } = require('../utils/erros');
 const { formatarDataHora } = require('../utils/datas');
+const { formatarValor } = require('../utils/dinheiro');
 
 // 404 também para paciente de OUTRA psicóloga (e não 403): responder
 // "acesso negado" confirmaria que aquele id existe.
 const naoEncontrado = () => new ErroHttp(404, 'Paciente não encontrado');
+
+// Preço como texto com 2 casas ("120.00"), como todo valor da API.
+const paraResposta = (p) => p && { ...p, valorSessao: formatarValor(p.valorSessao) };
 
 // Códigos de erro do Prisma: P2002 = violou restrição UNIQUE (aqui, o
 // @@unique([psicologoId, cpf])); P2025 = registro do update não encontrado.
@@ -12,13 +16,13 @@ const CPF_DUPLICADO = 'P2002';
 const REGISTRO_INEXISTENTE = 'P2025';
 
 async function listar(psicologoId, filtros) {
-  return pacientesRepository.listar(psicologoId, filtros);
+  return (await pacientesRepository.listar(psicologoId, filtros)).map(paraResposta);
 }
 
 async function buscar(psicologoId, id) {
   const paciente = await pacientesRepository.buscarPorId(psicologoId, id);
   if (!paciente) throw naoEncontrado();
-  return paciente;
+  return paraResposta(paciente);
 }
 
 // A unicidade do CPF fica a cargo do banco: o service não confere antes e
@@ -26,7 +30,7 @@ async function buscar(psicologoId, id) {
 // conferência). Tenta gravar e, se o banco recusar, explica o motivo.
 async function comTratamentoDeErro(psicologoId, cpf, operacao) {
   try {
-    return await operacao();
+    return paraResposta(await operacao());
   } catch (erro) {
     if (erro.code === REGISTRO_INEXISTENTE) throw naoEncontrado();
     if (erro.code === CPF_DUPLICADO) throw await erroCpfDuplicado(psicologoId, cpf);
@@ -79,7 +83,7 @@ async function arquivar(psicologoId, id) {
     case 'sessoes_futuras':
       throw new ErroHttp(422, mensagemSessoesFuturas(resultado.sessoes), { sessoesFuturas: resultado.sessoes });
     default: // 'arquivado' ou 'ja_arquivado'
-      return resultado.paciente;
+      return paraResposta(resultado.paciente);
   }
 }
 

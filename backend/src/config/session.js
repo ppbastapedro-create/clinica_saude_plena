@@ -41,7 +41,7 @@ const sessionStore = new PgStore({
 
 const sessionMiddleware = session({
   name: NOME_COOKIE,
-  secret: env.SESSION_SECRET,
+  secret: env.exigirSegredo('SESSION_SECRET'),
   store: sessionStore,
   resave: false,
   saveUninitialized: false, // só cria sessão (e cookie) no login

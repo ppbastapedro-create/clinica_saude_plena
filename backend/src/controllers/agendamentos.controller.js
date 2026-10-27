@@ -1,21 +1,26 @@
 const { z } = require('zod');
 const agendamentosService = require('../services/agendamentos.service');
-const { validar, idSchema } = require('../utils/validacao');
-
-// Data/hora sempre com fuso (ex.: 2026-11-10T14:00:00-03:00 ou ...Z). Sem
-// fuso, "14:00" seria interpretado no fuso de quem lê — o servidor no Render
-// roda em UTC, e a sessão cairia 3 horas fora do lugar.
-const dataHora = z
-  .iso.datetime({ offset: true, error: 'Use data/hora ISO 8601 com fuso, ex.: 2026-11-10T14:00:00-03:00' })
-  .transform((texto) => new Date(texto));
+const { validar, idSchema, dataHora, valorSchema } = require('../utils/validacao');
 
 const intervaloSchema = z.object({ inicio: dataHora, fim: dataHora });
 
 // psicologoId não está aqui (é descartado se vier no corpo): o dono é a
-// usuária da sessão.
+// usuária da sessão. `valor` (preço desta sessão): omitido = preço padrão do
+// paciente; null = sem valor. Pode ser ajustado depois em PATCH /:id/cobranca.
 const criarSchema = intervaloSchema.extend({
   pacienteId: z.number('Informe o paciente').int().positive().max(2_147_483_647),
+  valor: valorSchema.nullable().optional(),
 });
+
+// Cobrança da sessão: o que vier é alterado, o que faltar fica como está.
+// cobrar: true = cobra (inclusive uma falta); false = não cobra (ex.:
+// cortesia); null = volta para a regra padrão pelo status.
+const cobrancaSchema = z
+  .object({
+    valor: valorSchema.nullable().optional(),
+    cobrar: z.boolean('cobrar deve ser true, false ou null').nullable().optional(),
+  })
+  .refine((d) => d.valor !== undefined || d.cobrar !== undefined, { message: 'Informe valor e/ou cobrar', path: ['valor'] });
 
 // Aceita os 4 status para que pedir "AGENDADO" responda 422 (transição não
 // permitida, regra de negócio) e não 400 (valor desconhecido).
@@ -59,4 +64,10 @@ async function alterarStatus(req, res) {
   res.json(await agendamentosService.alterarStatus(donoDa(req), id, status));
 }
 
-module.exports = { listar, buscar, criar, remarcar, alterarStatus };
+async function atualizarCobranca(req, res) {
+  const { id } = validar(idSchema, req.params);
+  const dados = validar(cobrancaSchema, req.body ?? {});
+  res.json(await agendamentosService.atualizarCobranca(donoDa(req), id, dados));
+}
+
+module.exports = { listar, buscar, criar, remarcar, alterarStatus, atualizarCobranca };
