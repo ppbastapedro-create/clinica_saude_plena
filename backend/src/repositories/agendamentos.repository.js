@@ -168,8 +168,9 @@ async function alterarStatus(psicologoId, id, status) {
 }
 
 // Sessões que precisam de lembrete agora: AGENDADO, começando em (agora, ate],
-// lembrete ainda não enviado, paciente não arquivado e com opt-in, conta da
-// psicóloga ativa. Sessão no passado (lançamento retroativo) nunca entra:
+// lembrete ainda não enviado, paciente não arquivado, com opt-in E com
+// consentimento LGPD vigente (premissa da EAP: quem recebe lembrete consentiu),
+// conta da psicóloga ativa. Sessão no passado (lançamento retroativo) nunca entra:
 // inicio > agora. De TODOS os psicólogos — o job roda uma vez para o sistema.
 // O e-mail do paciente sai daqui só para o envio; não vai para log nenhum.
 async function listarParaLembrete(agora, ate) {
@@ -178,7 +179,12 @@ async function listarParaLembrete(agora, ate) {
       status: 'AGENDADO',
       inicio: { gt: agora, lte: ate },
       lembreteEnviadoEm: null,
-      paciente: { arquivadoEm: null, receberLembrete: true, email: { not: null } },
+      paciente: {
+        arquivadoEm: null,
+        receberLembrete: true,
+        email: { not: null },
+        consentimentos: { some: { revogadoEm: null } },
+      },
       psicologo: { ativo: true },
     },
     select: { id: true, inicio: true, fim: true, paciente: { select: { nome: true, email: true } } },

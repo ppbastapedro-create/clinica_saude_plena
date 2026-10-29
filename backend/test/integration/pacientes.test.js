@@ -105,6 +105,7 @@ describe('POST /pacientes', () => {
       receberLembrete: false,
       arquivadoEm: null,
       criadoEm: expect.any(String),
+      consentimentoVigente: false,
     });
   });
 
@@ -190,6 +191,7 @@ describe('POST /pacientes', () => {
       receberLembrete: false,
       arquivadoEm: null,
       criadoEm: expect.any(String),
+      consentimentoVigente: false,
     });
     expect(resposta.body.id).not.toBe(daA.id);
 

@@ -13,7 +13,9 @@ jobs:
         working-directory: backend
     services:
       postgres:
-        image: postgres:16
+        # Mesma versão major do Supabase de produção (17): o que passa aqui
+        # precisa passar lá.
+        image: postgres:17
         env:
           POSTGRES_USER: saude_plena
           POSTGRES_PASSWORD: saude_plena
@@ -47,9 +49,9 @@ jobs:
       - run: npx prisma generate
       # `prisma` é peer dependency opcional de @prisma/client: um `npm audit
       # --omit=dev` isolado ainda o conta (e a árvore dele tem 3 altas via
-      # deepmerge-ts). O deploy real usa `npm ci --omit=dev --omit=optional`
-      # (ver docker-compose/README de deploy), então auditamos com as mesmas
-      # flags para refletir o que realmente vai pra produção.
+      # deepmerge-ts). No deploy, o build usa o CLI e depois roda `npm prune
+      # --omit=dev --omit=optional` (ver docs/implantacao.md), então auditamos
+      # com as mesmas flags para refletir o que o servidor realmente carrega.
       - run: npm audit --omit=dev --omit=optional
 
       # Aplica as migrações commitadas no banco de teste do service container

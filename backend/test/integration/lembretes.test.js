@@ -32,6 +32,8 @@ const criarPaciente = (psicologo, dados = {}) =>
       cpf: CPFS[proximoCpf++],
       email: 'maria.clara@exemplo.test',
       receberLembrete: true,
+      // Consentimento LGPD vigente: sem ele, nada é enviado (teste próprio abaixo).
+      consentimentos: { create: { versaoTermo: 'v1', aceitoEm: h('2031-01-01T10:00') } },
       ...dados,
     },
   });
@@ -77,6 +79,7 @@ beforeAll(async () => {
 async function limpar() {
   const psicologoId = { in: [psiA.id, psiInativa.id] };
   await prisma.agendamento.deleteMany({ where: { psicologoId } });
+  await prisma.consentimento.deleteMany({ where: { paciente: { psicologoId } } });
   await prisma.paciente.deleteMany({ where: { psicologoId } });
   proximoCpf = 0;
 }
@@ -146,6 +149,12 @@ describe('quem recebe', () => {
 
   test.each([
     ['paciente sem opt-in', { paciente: { receberLembrete: false } }, '2031-01-11T10:00'],
+    ['paciente sem consentimento LGPD', { paciente: { consentimentos: undefined } }, '2031-01-11T10:00'],
+    [
+      'consentimento revogado',
+      { paciente: { consentimentos: { create: { versaoTermo: 'v1', aceitoEm: h('2031-01-01T10:00'), revogadoEm: h('2031-01-05T10:00') } } } },
+      '2031-01-11T10:00',
+    ],
     ['paciente arquivado', { paciente: { arquivadoEm: h('2031-01-01T10:00') } }, '2031-01-11T10:00'],
     ['sessão cancelada', { sessao: { status: 'CANCELADO' } }, '2031-01-11T10:00'],
     ['sessão no passado (lançamento retroativo)', {}, '2031-01-10T09:00'],

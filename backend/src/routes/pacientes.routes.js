@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const pacientesController = require('../controllers/pacientes.controller');
 const financeiroController = require('../controllers/financeiro.controller');
+const consentimentosController = require('../controllers/consentimentos.controller');
 const { exigirAutenticacao, exigirPapel } = require('../middlewares/autenticacao');
 
 const router = Router();
@@ -16,6 +17,11 @@ router.get('/:id/sessoes', pacientesController.sessoes);
 // Conta corrente do paciente: extrato (débitos e créditos) e recebimentos.
 router.get('/:id/financeiro', financeiroController.extrato);
 router.post('/:id/recebimentos', financeiroController.registrarRecebimento);
+// Termo de consentimento LGPD: histórico, aceite e revogação (sem DELETE —
+// revogar não apaga o aceite, registra a data da revogação).
+router.get('/:id/consentimentos', consentimentosController.listar);
+router.post('/:id/consentimentos', consentimentosController.registrar);
+router.patch('/:id/consentimentos/revogar', consentimentosController.revogar);
 router.put('/:id', pacientesController.atualizar);
 router.patch('/:id/arquivar', pacientesController.arquivar);
 router.patch('/:id/reativar', pacientesController.reativar);

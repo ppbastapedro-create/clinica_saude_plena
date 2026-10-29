@@ -6,5 +6,10 @@ node_modules/
 # assinatura) — nunca no repositório, que é público.
 *assinado*.pdf
 Termo_de_*.pdf
+# Backups e chaves (pacote 1.6.1): dump tem dado de paciente; a chave privada
+# do age decifra todos os backups. Nada disso entra no repositório, nem cifrado.
+*.dump
+*.age
+chave-backup*
 # Relatório de cobertura dos testes (npm run test:cobertura) — gerado, não versionado.
 coverage/

@@ -93,7 +93,8 @@ export async function montar(raiz, ctx) {
 
   // Lembrete por e-mail (pacote 1.4.8): quem envia é o job de hora em hora
   // (GitHub Actions), não esta tela — aqui só se mostra a situação. Mesmas
-  // regras do backend (lembretes.service): só AGENDADO, futura, com opt-in.
+  // regras do backend (lembretes.service): só AGENDADO, futura, com opt-in e
+  // consentimento LGPD vigente.
   function cartaoLembrete(ag, paciente) {
     const topo = { titulo: 'Lembrete por e-mail', icone: 'email' };
     const nota = (texto) => el('p', { class: 'texto-suave' }, texto);
@@ -109,6 +110,13 @@ export async function montar(raiz, ctx) {
         topo,
         nota('Este paciente não recebe lembretes.'),
         el('p', { class: 'nota' }, el('a', { href: `#/pacientes/${paciente.id}` }, 'Ativar no cadastro do paciente'), ' (só com a concordância dele).'),
+      );
+    }
+    if (!paciente.consentimentoVigente) {
+      return cartao(
+        { ...topo, extra: selo('Bloqueado', 'selo-falta') },
+        nota('O lembrete está ligado, mas o paciente não tem termo de consentimento vigente: nada é enviado.'),
+        el('p', { class: 'nota' }, el('a', { href: `#/pacientes/${paciente.id}` }, 'Registrar o consentimento na ficha do paciente'), '.'),
       );
     }
     return cartao(

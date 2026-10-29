@@ -300,6 +300,7 @@ async function montarFormulario(raiz, inicial) {
     const recebe = estado.paciente?.receberLembrete;
     if (recebe === undefined) return '—';
     if (!recebe) return 'Não (desativado no cadastro)';
+    if (!estado.paciente.consentimentoVigente) return 'Não (sem termo de consentimento)';
     if (inicio && inicio <= new Date()) return 'Não (sessão no passado)';
     return 'Sim, cerca de 24 h antes';
   }

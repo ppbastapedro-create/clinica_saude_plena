@@ -1,0 +1,137 @@
+/* Modelo imprimível do termo de consentimento (termo-consentimento.html).
+   Arquivo próprio: a CSP do servidor não aceita estilo inline. */
+
+body {
+  margin: 0;
+  background: #f4f4f2;
+  color: #1d1d1b;
+  font: 15px/1.55 Georgia, 'Times New Roman', serif;
+}
+
+.termo {
+  max-width: 760px;
+  margin: 24px auto;
+  padding: 40px 48px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 21px;
+  text-align: center;
+}
+
+.subtitulo {
+  margin: 0 0 24px;
+  font-size: 13px;
+  text-align: center;
+  color: #555;
+}
+
+h2 {
+  margin: 20px 0 6px;
+  font-size: 15px;
+}
+
+section p,
+section ul,
+section ol {
+  margin: 0 0 8px;
+}
+
+/* Espaços para preencher à mão */
+.campo-linha,
+.campo-curto,
+.linha-assinatura {
+  display: inline-block;
+  border-bottom: 1px solid #1d1d1b;
+  vertical-align: bottom;
+}
+
+.campo-linha {
+  width: 280px;
+  height: 1.2em;
+}
+
+.campo-curto {
+  width: 140px;
+  height: 1.2em;
+}
+
+.local-data {
+  margin-top: 28px;
+}
+
+.assinaturas {
+  display: grid;
+  gap: 32px;
+  margin-top: 40px;
+  font-size: 13px;
+}
+
+.linha-assinatura {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: 36px;
+  margin-bottom: 4px;
+}
+
+.versao {
+  margin-top: 32px;
+  font-size: 11px;
+  color: #777;
+  text-align: right;
+}
+
+.revisar {
+  color: #a33;
+  font-size: 13px;
+}
+
+.aviso-tela {
+  margin: 0 0 20px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #eef4ee;
+  font: 13px/1.4 system-ui, sans-serif;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .termo {
+    margin: 0;
+    padding: 24px 16px;
+  }
+
+  .campo-linha {
+    width: 100%;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+
+  .termo {
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .aviso-tela {
+    display: none;
+  }
+
+  section {
+    break-inside: avoid;
+  }
+}

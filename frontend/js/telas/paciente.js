@@ -14,7 +14,6 @@ import {
   seloStatus,
   selo,
   seloSaldo,
-  emBreve,
   reais,
   lerValor,
   valorParaCampo,
@@ -87,7 +86,7 @@ function formularioPaciente(paciente, { textoBotao, aoSalvar, primario = false }
     'div',
     { class: 'grupo grupo-receberLembrete' },
     el('label', { class: 'legenda-check' }, caixaLembrete, 'Enviar lembrete das sessões por e-mail'),
-    el('p', { class: 'nota' }, 'Só com a concordância do paciente. O e-mail diz apenas "lembrete de atendimento", com data e hora — nada sobre psicologia.'),
+    el('p', { class: 'nota' }, 'Só com a concordância do paciente — o lembrete só sai com o termo de consentimento registrado. O e-mail diz apenas "lembrete de atendimento", com data e hora — nada sobre psicologia.'),
     errosCampo.receberLembrete,
   );
 
@@ -187,14 +186,103 @@ export async function montarFicha(raiz, ctx) {
   let avisoConta = null; // alerta no cartão da conta (recebimento/estorno)
 
   async function carregar() {
-    const [paciente, sessoesBrutas, conta] = await Promise.all([
+    const [paciente, sessoesBrutas, conta, consentimentos] = await Promise.all([
       api(`/pacientes/${id}`),
       api(`/pacientes/${id}/sessoes`),
       api(`/pacientes/${id}/financeiro`),
+      api(`/pacientes/${id}/consentimentos`),
     ]);
     const sessoes = sessoesBrutas.map((s) => ({ ...s, inicio: new Date(s.inicio), fim: new Date(s.fim) }));
     ctx.titulo(paciente.nome);
-    renderizar(paciente, sessoes, conta);
+    renderizar(paciente, sessoes, conta, consentimentos);
+  }
+
+  // ── Consentimento LGPD ──
+  // O termo é assinado em papel (modelo em termo-consentimento.html); aqui se
+  // registra o aceite (data e versão) e a revogação. Nada é apagado.
+  let avisoConsentimento = null;
+
+  async function acaoConsentimento(chamada, textoSucesso) {
+    try {
+      await chamada();
+      avisoConsentimento = alerta('sucesso', textoSucesso);
+    } catch (erro) {
+      avisoConsentimento = alerta('erro', mensagemDe(erro));
+    }
+    await carregar();
+  }
+
+  function cartaoConsentimento(paciente, { versaoAtual, vigente, historico }) {
+    const arquivado = Boolean(paciente.arquivadoEm);
+    const topo = {
+      titulo: 'Consentimento LGPD',
+      icone: 'escudo',
+      extra: vigente ? selo('Vigente', 'selo-realizado') : selo('Sem consentimento', 'selo-falta'),
+    };
+    const linkModelo = el(
+      'p',
+      { class: 'nota' },
+      el('a', { href: 'termo-consentimento.html', target: '_blank', rel: 'noopener' }, `Imprimir o termo em branco (versão ${versaoAtual})`),
+    );
+
+    let corpo;
+    if (vigente) {
+      const revogar = () => {
+        if (
+          !window.confirm(
+            `Registrar que ${paciente.nome} revogou o consentimento? Os lembretes por e-mail são desligados. ` +
+              'Os registros de atendimento continuam guardados (obrigação de 5 anos — Resolução CFP nº 001/2009).',
+          )
+        ) {
+          return;
+        }
+        acaoConsentimento(() => api(`/pacientes/${id}/consentimentos/revogar`, { metodo: 'PATCH' }), 'Revogação registrada.');
+      };
+      corpo = [
+        el('p', {}, `Termo ${vigente.versaoTermo} aceito em ${D.data(new Date(vigente.aceitoEm))}.`),
+        el('div', { class: 'acoes-status' }, botao('Registrar revogação', { perigo: true, onclick: revogar })),
+      ];
+    } else if (arquivado) {
+      corpo = el('p', { class: 'texto-suave' }, 'Paciente arquivado: reative o cadastro para registrar um aceite novo.');
+    } else {
+      const campoData = el('input', { class: 'campo', id: 'consent-data', type: 'date', value: D.paraInputData(new Date()), max: D.paraInputData(new Date()) });
+      const enviar = (evento) => {
+        evento.preventDefault();
+        const dia = D.deInputData(campoData.value);
+        // Hoje = agora; outro dia = meio-dia daquele dia (como no recebimento).
+        const aceitoEm = !dia || D.mesmoDia(dia, new Date()) ? undefined : D.isoComFuso(D.comHora(dia, '12:00'));
+        acaoConsentimento(() => api(`/pacientes/${id}/consentimentos`, { metodo: 'POST', corpo: aceitoEm ? { aceitoEm } : {} }), 'Aceite registrado.');
+      };
+      corpo = [
+        el('p', { class: 'texto-suave' }, 'Peça ao paciente para ler e assinar o termo; depois registre aqui a data da assinatura.'),
+        el(
+          'form',
+          { class: 'form-consentimento', novalidate: true, onsubmit: enviar },
+          el('div', { class: 'grupo' }, el('label', { class: 'rotulo', for: 'consent-data' }, 'Data da assinatura'), campoData),
+          el('div', { class: 'acoes-status' }, botao(`Registrar aceite (termo ${versaoAtual})`, { primario: true, icone: 'ok', type: 'submit' })),
+        ),
+      ];
+    }
+
+    const linhasHistorico = historico.map((c) =>
+      el(
+        'li',
+        {},
+        `Termo ${c.versaoTermo}: aceito em ${D.data(new Date(c.aceitoEm))}`,
+        c.revogadoEm ? `, revogado em ${D.data(new Date(c.revogadoEm))}` : ' (vigente)',
+      ),
+    );
+
+    const mensagem = avisoConsentimento;
+    avisoConsentimento = null; // mostra uma vez só
+    return cartao(
+      topo,
+      mensagem,
+      corpo,
+      linkModelo,
+      historico.length > (vigente ? 1 : 0) && el('details', {}, el('summary', {}, 'Histórico'), el('ul', { class: 'lista-consentimentos' }, linhasHistorico)),
+      el('p', { class: 'nota' }, 'A revogação é direito do paciente a qualquer momento (LGPD art. 8º, §5º). Aceites e revogações ficam no histórico.'),
+    );
   }
 
   async function registrarRecebimento(corpo) {
@@ -314,7 +402,7 @@ export async function montarFicha(raiz, ctx) {
     await carregar();
   }
 
-  function renderizar(paciente, sessoes, conta) {
+  function renderizar(paciente, sessoes, conta, consentimentos) {
     const arquivado = Boolean(paciente.arquivadoEm);
     const realizadas = sessoes.filter((s) => s.status === 'REALIZADO').length;
     const primeira = sessoes.at(-1)?.inicio; // a lista vem da mais recente para a mais antiga
@@ -354,11 +442,7 @@ export async function montarFicha(raiz, ctx) {
           'div',
           { class: 'coluna' },
           cartao({ titulo: 'Dados cadastrais' }, form),
-          cartao(
-            { titulo: 'Consentimento LGPD', icone: 'escudo', extra: emBreve('futuro'), classe: 'cartao-em-breve' },
-            el('p', { class: 'texto-suave' }, 'Registro do aceite do termo (versão e data) e da revogação. O banco já guarda esse histórico; as telas e rotas ainda não foram implementadas.'),
-            el('p', { class: 'nota' }, 'A revogação é direito do paciente (LGPD art. 8º, §5º). Aceites e revogações ficam no histórico.'),
-          ),
+          cartaoConsentimento(paciente, consentimentos),
         ),
         el('div', { class: 'coluna' }, cartaoConta(conta), cartao({ titulo: 'Histórico de sessões', classe: 'cartao-tabela' }, historico(sessoes))),
       ),

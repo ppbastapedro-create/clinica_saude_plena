@@ -1,0 +1,136 @@
+name: Backup
+
+# Backup diário do banco de produção (pacote 1.6.1), com teste de restauração
+# a CADA execução: o dump é restaurado num Postgres descartável e conferido
+# tabela a tabela antes de ser cifrado e guardado. Backup que nunca foi
+# restaurado não é backup.
+#
+# Fluxo: pg_dump → restaura num container → confere contagens → cifra com age
+#        (chave PÚBLICA) → envia ao bucket privado (S3 compatível).
+# Este job consegue cifrar, mas não decifrar: a chave privada fica offline
+# (ver docs/backup-restauracao.md). Mesmo princípio do job de lembretes, que
+# não recebe a chave do prontuário.
+#
+# Secrets (Settings → Secrets and variables → Actions → Secrets):
+#   BACKUP_DATABASE_URL    URL do pooler do Supabase, modo SESSION (porta 5432),
+#                          com o usuário só-leitura backup_leitura, sem
+#                          "?schema=public". (A conexão direta do Supabase é
+#                          só IPv6, e o runner do GitHub não tem IPv6.)
+#   BACKUP_S3_ENDPOINT     ex.: https://s3.us-east-005.backblazeb2.com
+#   BACKUP_S3_BUCKET       nome do bucket privado
+#   BACKUP_S3_KEY_ID       chave de aplicação SÓ DE ESCRITA, restrita ao bucket
+#   BACKUP_S3_SECRET
+# Variables (mesma tela, aba Variables — não são segredo):
+#   BACKUP_AGE_DESTINATARIOS  chave(s) pública(s) age, uma por linha (age1...)
+#   BACKUP_S3_REGIAO          ex.: us-east-005 (padrão: us-east-1)
+#   POSTGRES_VERSAO_PRODUCAO  versão major do Postgres do Supabase (padrão 17)
+# NÃO cadastre aqui REGISTRO_CHAVE_V1 nem a chave privada do age.
+#
+# Enquanto BACKUP_DATABASE_URL não estiver cadastrado (antes do deploy), o job
+# só avisa e termina — não falha todo dia.
+#
+# Se falhar, o GitHub manda e-mail para quem configurou o agendamento.
+
+on:
+  schedule:
+    # 06:41 UTC = 03:41 em Brasília: consultório fechado. Longe do minuto 17,
+    # quando roda o job de lembretes.
+    - cron: '41 6 * * *'
+  workflow_dispatch: # botão "Run workflow", para testar à mão
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Ferramentas do Postgres vêm de um container, para não depender da versão
+  # instalada no runner. pg_dump mais novo que o servidor funciona; o
+  # contrário, não.
+  PG_FERRAMENTAS: postgres:18
+  RESTAURO_URL: postgresql://postgres:restauro@127.0.0.1:5432/postgres
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+    steps:
+      - name: Confere se o deploy já foi configurado
+        id: configurado
+        run: |
+          if [ -z "$BACKUP_DATABASE_URL" ]; then
+            echo "::notice::BACKUP_DATABASE_URL não cadastrado: backup desligado até o deploy."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.configurado.outputs.ok == 'true'
+        uses: actions/checkout@v4
+
+      # Postgres descartável, na mesma versão de produção, para o teste de
+      # restauração. Morre junto com o runner.
+      - if: steps.configurado.outputs.ok == 'true'
+        name: Sobe o Postgres de restauração
+        run: |
+          docker run -d --name restauro -p 5432:5432 -e POSTGRES_PASSWORD=restauro \
+            "postgres:${{ vars.POSTGRES_VERSAO_PRODUCAO || '17' }}"
+          # Pelo TCP: na inicialização a imagem sobe um servidor temporário só
+          # no socket local, e checar por ele daria "pronto" cedo demais.
+          for i in $(seq 60); do
+            docker exec restauro pg_isready -q -h 127.0.0.1 && exit 0
+            sleep 1
+          done
+          echo "::error::O Postgres de restauração não subiu."; docker logs restauro; exit 1
+
+      - if: steps.configurado.outputs.ok == 'true'
+        name: Gera, restaura e confere
+        run: |
+          mkdir -p saida
+          ferramentas() {
+            docker run --rm --network host -v "$PWD:/w" -w /w "$PG_FERRAMENTAS" "$@"
+          }
+          ferramentas bash backend/scripts/backup/gerar-dump.sh "$BACKUP_DATABASE_URL" saida/backup.dump
+          ferramentas bash backend/scripts/backup/restaurar.sh saida/backup.dump "$RESTAURO_URL"
+          ferramentas bash backend/scripts/backup/conferir.sh "$BACKUP_DATABASE_URL" "$RESTAURO_URL"
+
+      - if: steps.configurado.outputs.ok == 'true'
+        name: Cifra com age
+        env:
+          DESTINATARIOS: ${{ vars.BACKUP_AGE_DESTINATARIOS }}
+        run: |
+          if ! grep -q '^age1' <<< "$DESTINATARIOS"; then
+            echo "::error::Variável BACKUP_AGE_DESTINATARIOS vazia ou inválida."; exit 1
+          fi
+          sudo apt-get install -y -qq age > /dev/null
+          printf '%s\n' "$DESTINATARIOS" > destinatarios.txt
+          NOME="saude-plena-$(date -u +%Y-%m-%dT%H%MZ).dump.age"
+          age --encrypt --recipients-file destinatarios.txt --output "saida/$NOME" saida/backup.dump
+          # O dump em claro não fica nem no disco do runner. (sudo: o arquivo
+          # foi criado pelo container, como root.)
+          sudo shred -u saida/backup.dump
+          echo "NOME=$NOME" >> "$GITHUB_ENV"
+
+      # diario/ todo dia; mensal/ também no dia 1. Quanto tempo cada prefixo
+      # fica guardado é regra de ciclo de vida do bucket (ver a documentação).
+      - if: steps.configurado.outputs.ok == 'true'
+        name: Envia ao bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET }}
+          AWS_DEFAULT_REGION: ${{ vars.BACKUP_S3_REGIAO || 'us-east-1' }}
+          ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          # O aws-cli novo manda checksums que nem todo S3 compatível aceita.
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+        run: |
+          aws s3 cp --only-show-errors --endpoint-url "$ENDPOINT" "saida/$NOME" "s3://$BUCKET/diario/$NOME"
+          if [ "$(date -u +%d)" = "01" ]; then
+            aws s3 cp --only-show-errors --endpoint-url "$ENDPOINT" "saida/$NOME" "s3://$BUCKET/mensal/$NOME"
+          fi
+          echo "Backup enviado: $NOME ($(wc -c < "saida/$NOME") bytes)"

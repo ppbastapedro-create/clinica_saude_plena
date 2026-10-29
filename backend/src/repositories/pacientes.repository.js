@@ -12,6 +12,8 @@ const CAMPOS = {
   receberLembrete: true,
   arquivadoEm: true,
   criadoEm: true,
+  // Só para saber se há consentimento vigente (vira booleano no service).
+  consentimentos: { where: { revogadoEm: null }, select: { id: true }, take: 1 },
 };
 
 // Toda consulta leva psicologoId no where. É isso que impede uma psicóloga

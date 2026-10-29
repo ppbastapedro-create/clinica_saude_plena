@@ -47,14 +47,16 @@ primeiro agenda, pacientes e autenticação.
     - Devcontainer/Codespaces (`.devcontainer/`): `postgres:16`, host `db:5432`, usuário
       `saude_plena`; o `post-create.sh` gera os `.env` trocando `localhost:5433` por
       `db:5432`. O seed aceita o host `db` sem precisar de `SEED_ALLOW=1`.
-    - CI (`.github/workflows/ci.yml`): service container `postgres:16`, host
+    - CI (`.github/workflows/ci.yml`): service container `postgres:17` (= Supabase de produção), host
       `localhost:5432`, usuário `saude_plena`, só o banco `saude_plena_test`.
   - **Windows local (PC do autor):** PostgreSQL **18** nativo (serviço
     `postgresql-x64-18`), host `localhost:5432`, usuário `app_saude_plena` (dono dos bancos
     `saude_plena` e `saude_plena_test`, com `CREATEDB` para o shadow database do
     `prisma migrate dev`).
-  - Atenção à diferença de versão: o CI testa no Postgres 16 e o PC do autor roda o 18. O
-    que passa local precisa passar no CI antes de ser considerado pronto.
+  - Atenção à diferença de versão: produção (Supabase, São Paulo, criado em 2026-10-27) e
+    CI rodam o Postgres **17**; o PC do autor roda o 18; docker-compose/devcontainer ficam
+    no 16 (volumes já criados). O que passa local precisa passar no CI antes de ser
+    considerado pronto.
 - O autor está aprendendo: explicar o "porquê" das decisões, não só entregar código.
 - Nunca usar dados reais de pacientes em testes/seeds — só dados fictícios.
 - Segredos sempre em `.env` (nunca commitado); manter `.env.example` atualizado.
@@ -243,9 +245,42 @@ com a exclusion constraint entram no pacote 1.4.2.
       `Permissions-Policy`, `no-store` em toda a API, frontend do Projeto 3 **apagado**
       (decisão do autor; `/` redireciona para `/login.html`). O `README.md` ainda
       descreve o Projeto 3 — atualizar no 1.6.2 (manual).
-    - **1.6.1:** conferir a versão do Postgres no Supabase e alinhar a imagem do CI
-      (`postgres:16` em `.github/workflows/ci.yml`) a ela — o CI deve testar na mesma versão
-      de produção.
+    - **1.5.3 Aceite (2026-10-27):** `docs/aceite/roteiro-aceitacao.md` (13 tarefas
+      cobrindo o escopo, 3 cronometradas — meta < 1 min da EAP; tabela R1–R7 das regras
+      pendentes com a parceira; avaliação 1–5) e `docs/aceite/termo-aceite-modelo.md`
+      (sem dados pessoais; o assinado fica fora do git). O teste roda em
+      **homologação** (notebook/ambiente separado, seed fictício), nunca em produção:
+      sem exclusão física, paciente fictício em produção ficaria para sempre.
+    - **Consentimento LGPD (2026-10-27, opção (a) do autor):** modelo imprimível em
+      `frontend/termo-consentimento.html` (público, sem dados; texto a revisar com a
+      parceira) + rotas `GET|POST /pacientes/:id/consentimentos` e
+      `PATCH .../consentimentos/revogar`. Um vigente por vez (linha do paciente travada
+      com FOR UPDATE — sem índice parcial, que o Prisma não expressa); versão do termo
+      definida no service (`VERSAO_TERMO_ATUAL`, testada contra o rodapé do modelo),
+      nunca pelo cliente. Revogar desliga `receberLembrete`; paciente arquivado revoga,
+      mas não registra aceite novo. **Lembrete exige consentimento vigente** (premissa
+      da EAP). Paciente na API ganhou `consentimentoVigente`.
+    - **1.6.1 Implantação (código/docs em 2026-10-27; execução é do autor):**
+      roteiro em `docs/implantacao.md`, backup em `docs/backup-restauracao.md`.
+      - Backup: `.github/workflows/backup.yml` diário → `pg_dump` (só `public`, sem
+        linhas de `session`) → **restaura num container e confere contagens a cada
+        execução** → age com chave **pública** (privada offline) → bucket privado
+        Backblaze B2 (chave só escrita; `diario/` 35 dias, `mensal/` 12 meses).
+        Decisões do autor: bucket privado (repo é público) e age em vez de GPG.
+      - Scripts em `backend/scripts/backup/` (testados no PG 18 local). O
+        `restaurar.sh` tira da lista o `CREATE SCHEMA public` (que o `--schema=public`
+        grava e falha em banco novo) e o `COMMENT ON EXTENSION` (o Supabase não deixa).
+      - Supabase só via **Session pooler** (5432): a conexão direta é só IPv6. Data API
+        desligada + revogação de `anon`/`authenticated`.
+      - Build no Render: `npm ci --include=dev` (com `NODE_ENV=production` o CLI do
+        prisma ficaria de fora) … `npm prune --omit=dev --omit=optional` (testado).
+      - Simulado de restauração sem dado real no PC: parte A com o seed; parte B em
+        produção antes de criar a conta da parceira.
+      - Supabase criado (org `saude_plena`, sa-east-1, Postgres 17, Data API off). O
+        "automatic RLS" veio ligado mesmo desmarcado: `ensure_rls` e
+        `rls_auto_enable()` removidos à mão. CI/ZAP/backup alinhados ao 17.
+      - Pendente: quem guarda as chaves offline [a combinar com a parceira];
+        transferência internacional (Render fora do Brasil) no termo/relatório.
   - Cronograma de referência da EAP: desenvolvimento previsto 02/11 a 22/11/2026; testes e
     aceitação 23/11 a 29/11/2026; implantação 30/11 a 06/12/2026.
 

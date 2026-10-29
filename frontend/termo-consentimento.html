@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Termo de consentimento — tratamento de dados pessoais</title>
+  <link rel="stylesheet" href="css/termo.css">
+</head>
+<body>
+  <!--
+    Modelo do termo de consentimento LGPD (escopo da EAP). Página estática,
+    sem dado nenhum: a psicóloga imprime em branco, o paciente preenche e
+    assina. O sistema registra só o aceite (data e versão) — ver
+    backend/src/services/consentimentos.service.js.
+
+    MUDOU O TEXTO? Suba a versão aqui no rodapé E em VERSAO_TERMO_ATUAL no
+    service: o registro precisa dizer qual texto o paciente aceitou.
+
+    Texto redigido pelo desenvolvedor a partir da LGPD e da Resolução CFP
+    nº 001/2009 — revisar com a parceira antes de usar (os trechos marcados
+    [revisar] dependem dela).
+  -->
+  <main class="termo">
+    <p class="aviso-tela">Para imprimir, use <kbd>Ctrl</kbd> + <kbd>P</kbd>. Este aviso não sai na impressão.</p>
+
+    <h1>Termo de consentimento para tratamento de dados pessoais</h1>
+    <p class="subtitulo">Lei Geral de Proteção de Dados Pessoais — Lei nº 13.709/2018 (LGPD)</p>
+
+    <section>
+      <h2>Partes</h2>
+      <p><strong>Psicóloga responsável (controladora dos dados):</strong>
+        <span class="campo-linha"></span> CRP <span class="campo-curto"></span><br>
+        Contato para assuntos de dados pessoais: <span class="campo-linha"></span></p>
+      <p><strong>Paciente (titular dos dados):</strong> <span class="campo-linha"></span>
+        CPF <span class="campo-curto"></span></p>
+    </section>
+
+    <section>
+      <h2>1. Quais dados são tratados</h2>
+      <ul>
+        <li>Identificação e contato: nome, CPF, e-mail e telefone.</li>
+        <li>Agenda e pagamentos: datas das sessões, faltas, valores e formas de pagamento.</li>
+        <li>Registros de atendimento (evolução das sessões) — <strong>dados pessoais sensíveis</strong>,
+          referentes à saúde (LGPD, art. 5º, II).</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>2. Para que são usados</h2>
+      <ol type="a">
+        <li>Organizar a agenda e os atendimentos.</li>
+        <li>Manter o registro documental dos atendimentos, <strong>obrigatório</strong> para a
+          psicóloga (Resolução CFP nº 001/2009).</li>
+        <li>Controlar pagamentos.</li>
+        <li><strong>Opcional:</strong> enviar lembrete das sessões por e-mail. O e-mail diz apenas
+          "lembrete de atendimento", com data e hora.<br>
+          ( &nbsp; ) Aceito receber lembretes por e-mail &nbsp;&nbsp; ( &nbsp; ) Não aceito</li>
+      </ol>
+      <p>Os dados não são usados para publicidade nem vendidos ou cedidos a ninguém.</p>
+    </section>
+
+    <section>
+      <h2>3. Como são protegidos</h2>
+      <p>Os dados ficam num sistema com acesso exclusivo da psicóloga, protegido por senha. Os
+        registros de atendimento são guardados criptografados, e há cópias de segurança
+        periódicas. Para funcionar, o sistema usa prestadores de serviços de tecnologia
+        (hospedagem, banco de dados e envio de e-mail), que tratam os dados apenas para essa
+        finalidade e sob obrigação de segurança; alguns desses serviços podem estar
+        localizados fora do Brasil. <em class="revisar">[revisar: listar os prestadores e países
+        na implantação]</em></p>
+    </section>
+
+    <section>
+      <h2>4. Por quanto tempo</h2>
+      <p>Os registros de atendimento são guardados por, no mínimo, <strong>5 anos</strong>
+        (Resolução CFP nº 001/2009), mesmo após o fim do acompanhamento. Depois desse prazo, podem
+        ser eliminados.</p>
+    </section>
+
+    <section>
+      <h2>5. Seus direitos</h2>
+      <p>A qualquer momento, mediante pedido à psicóloga, você pode: confirmar que seus dados são
+        tratados e ter acesso a eles; corrigir dados incompletos ou desatualizados; saber com quem
+        eles são compartilhados; e <strong>revogar este consentimento</strong> (LGPD, arts. 8º,
+        §5º, e 18).</p>
+      <p>A revogação interrompe o que depende do seu consentimento, como os lembretes por e-mail.
+        Os registros que a psicóloga é obrigada a guardar (item 4) são mantidos pelo prazo
+        mínimo (LGPD, art. 16, I).</p>
+    </section>
+
+    <section>
+      <h2>6. Declaração</h2>
+      <p>Declaro que li este termo, que tive a oportunidade de tirar dúvidas e que
+        <strong>consinto</strong> com o tratamento dos meus dados pessoais, inclusive os dados
+        sensíveis de saúde, para as finalidades descritas acima.</p>
+    </section>
+
+    <p class="local-data">Brasília, ____ de ____________________ de ________.</p>
+
+    <div class="assinaturas">
+      <div><span class="linha-assinatura"></span>Paciente</div>
+      <div><span class="linha-assinatura"></span>Responsável legal (se o paciente tiver menos de 18 anos)<br>
+        Nome: <span class="campo-linha"></span> CPF: <span class="campo-curto"></span></div>
+    </div>
+
+    <p class="versao">Termo de consentimento — versão v1 (outubro de 2026)</p>
+  </main>
+</body>
+</html>

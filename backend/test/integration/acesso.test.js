@@ -107,6 +107,13 @@ describe('páginas e cabeçalhos', () => {
     expect(resposta.headers.location).toBe('/login.html');
   });
 
+  test('o modelo do termo de consentimento abre sem login (é um formulário em branco, sem dado nenhum)', async () => {
+    const resposta = await request(app).get('/termo-consentimento.html');
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.text).toContain('versão v1');
+  });
+
   test.each(['/index.html', '/agendamento.html', '/script.js'])('%s (frontend do Projeto 3, removido) não existe mais', async (url) => {
     expect((await request(app).get(url)).status).toBe(404);
   });

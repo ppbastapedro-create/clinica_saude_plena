@@ -7,8 +7,13 @@ const { formatarValor } = require('../utils/dinheiro');
 // "acesso negado" confirmaria que aquele id existe.
 const naoEncontrado = () => new ErroHttp(404, 'Paciente não encontrado');
 
-// Preço como texto com 2 casas ("120.00"), como todo valor da API.
-const paraResposta = (p) => p && { ...p, valorSessao: formatarValor(p.valorSessao) };
+// Preço como texto com 2 casas ("120.00"), como todo valor da API. Do
+// consentimento LGPD, só se há um vigente (o histórico tem rota própria).
+const paraResposta = (p) => {
+  if (!p) return p;
+  const { consentimentos, ...dados } = p;
+  return { ...dados, valorSessao: formatarValor(p.valorSessao), consentimentoVigente: consentimentos.length > 0 };
+};
 
 // Códigos de erro do Prisma: P2002 = violou restrição UNIQUE (aqui, o
 // @@unique([psicologoId, cpf])); P2025 = registro do update não encontrado.

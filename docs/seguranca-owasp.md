@@ -38,7 +38,8 @@ Como a verificação é feita:
 - Bloqueio por conta (5 senhas erradas → 15 min) e limite por IP no login (10 falhas / 15 min).
 - Sem exclusão física (guarda de 5 anos): arquivar paciente, cancelar sessão, estornar recebimento.
 - Conflito de horário garantido pelo banco (*exclusion constraint*), não só pela aplicação.
-- Lembrete por e-mail só com opt-in do paciente e texto neutro (não revela atendimento psicológico).
+- Lembrete por e-mail só com opt-in do paciente **e** consentimento LGPD vigente, com texto neutro (não revela atendimento psicológico).
+- Consentimento LGPD: aceite (data e versão do termo) e revogação registrados, nunca apagados; a revogação desliga o lembrete e não apaga os registros de guarda obrigatória.
 
 ### A05 — Configuração incorreta de segurança
 - Helmet com CSP mais estrita que o padrão (**ajustado no 1.5.2**): estilo e fonte só do próprio site e do Google Fonts, sem `unsafe-inline`; `frame-ancestors 'none'` (clickjacking). **Teste:** `acesso.test.js`.
@@ -50,7 +51,7 @@ Como a verificação é feita:
 ### A06 — Componentes vulneráveis e desatualizados
 - **Corrigido no 1.5.2:** `body-parser` 2.3.0 (dependência do Express) tinha vulnerabilidade **alta** de negação de serviço (GHSA-27r3-jxmh-p828). Atualizado para 2.4.0; `npm audit --omit=dev` = 0 vulnerabilidades.
 - Dependabot configurado (npm e GitHub Actions).
-- **Risco aceito:** 3 alertas altos em `deepmerge-ts`, dependência do `prisma` (CLI de migração), que é **dependência de desenvolvimento** — não vai para o servidor de produção (`npm ci --omit=dev`). A correção exige a próxima versão principal do Prisma; reavaliar no 1.6.1.
+- **Risco aceito:** 3 alertas altos em `deepmerge-ts`, dependência do `prisma` (CLI de migração), que é **dependência de desenvolvimento**. A correção exige a próxima versão principal do Prisma. **Reavaliado no 1.6.1:** o build no Render instala o CLI para `prisma generate`/`migrate deploy` (que só leem arquivos do próprio repositório) e o remove em seguida com `npm prune --omit=dev --omit=optional` (testado: o client gerado continua funcionando). O processo do servidor nunca carrega o pacote. Continua aceito.
 
 ### A07 — Falhas de identificação e autenticação
 - Novo ID de sessão a cada login (*session fixation*); sessão expira com 60 min sem uso e no máximo 12 h após o login; logout destrói a sessão no banco.
@@ -77,7 +78,7 @@ Como a verificação é feita:
 | Item | Nível | Situação |
 |---|---|---|
 | Primeira execução do ZAP | — | Roda no GitHub após o push. Cada alerta é triado: corrigido, ou aceito em `.zap/rules.tsv` com justificativa registrada aqui |
-| `deepmerge-ts` via `prisma` (dev) | Alta, fora de produção | Aceito (ver A06); reavaliar no 1.6.1 |
+| `deepmerge-ts` via `prisma` (dev) | Alta, fora de produção | Aceito (ver A06); reavaliado no 1.6.1 |
 | Google Fonts | Baixo | O navegador da psicóloga contata o Google para baixar a fonte (expõe o IP). Alternativa: hospedar a fonte no próprio servidor |
 | Limite de login em memória | Baixo | Vale para uma instância (plano atual do Render); com várias, usar armazenamento compartilhado |
-| Itens de implantação (1.6.1) | — | HTTPS e segredos próprios no Render; backup criptografado com teste de restauração; versão do Postgres do CI = produção |
+| Itens de implantação (1.6.1) | — | Roteiro em `docs/implantacao.md` (HTTPS e segredos próprios no Render, Data API do Supabase desligada e revogações, versão do Postgres do CI = produção). Backup cifrado (age, chave pública) com teste de restauração a cada execução: `docs/backup-restauracao.md`. A executar pelo autor |

@@ -1247,6 +1247,13 @@
   gap: 14px;
 }
 
+.lista-consentimentos {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--texto-2);
+}
+
 /* ── Registro de evolução ───────────────────────────────────────────── */
 .faixa-sigilo {
   margin-bottom: 16px;
