@@ -37,7 +37,7 @@ jobs:
       # banco descartável; produção usa uma chave própria, configurada no Render.
       REGISTRO_CHAVE_V1: 0000000000000000000000000000000000000000000000000000000000000c1c
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:

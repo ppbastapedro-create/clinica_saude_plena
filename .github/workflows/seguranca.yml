@@ -54,7 +54,7 @@ jobs:
       SESSION_SECRET: segredo-apenas-para-a-varredura-0123456789abcdef
       REGISTRO_CHAVE_V1: 0000000000000000000000000000000000000000000000000000000000000c1c
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
