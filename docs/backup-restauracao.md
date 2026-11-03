@@ -82,6 +82,7 @@ O comando imprime a chave pública (`Public key: age1...`). O arquivo gerado con
 **privada** (`AGE-SECRET-KEY-1...`):
 
 - guarde o conteúdo no cofre de senhas e faça a cópia offline combinada acima;
+- **confira no cofre que a linha `AGE-SECRET-KEY-1...` está lá** (não só a pública `age1...`);
 - depois, **apague o arquivo do computador**. Ele só volta a existir na hora de decifrar;
 - nunca o coloque no repositório. O `.gitignore` bloqueia `chave-backup*`, mas não conte só
   com isso.
@@ -228,8 +229,14 @@ Preencha a cada simulado. Este é o documento que comprova o critério da EAP.
 
 | Data | Parte | Arquivo de backup | Restaurou? | Conferência | Registro legível? | Quem fez |
 |---|---|---|---|---|---|---|
-|  | A |  |  |  |  |  |
-|  | B |  |  |  | (sem registros) |  |
+| 2026-11-03 | B | `diario/` do workflow Backup, execução 41691297962 | Sim | OK (todas as tabelas) | (sem registros) | Autor |
+| 2026-11-03 | A | dump local do seed + 1 registro de teste, cifrado com a chave age nova | Sim | OK (todas as tabelas) | Sim | Autor |
+
+Ocorrência no simulado B (2026-11-03): a primeira chave privada age não tinha sido guardada
+no cofre antes de o arquivo ser apagado, e o primeiro backup de produção ficou impossível de
+abrir. Sem dano, porque o banco estava vazio. Foi gerado um par novo, a variável
+`BACKUP_AGE_DESTINATARIOS` foi trocada e o simulado foi refeito com o backup seguinte. Lição:
+**conferir no cofre que a linha `AGE-SECRET-KEY-1...` está lá antes de apagar o arquivo**.
 
 ## Restauração de verdade (desastre)
 

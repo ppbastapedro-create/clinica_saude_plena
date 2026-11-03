@@ -279,8 +279,18 @@ com a exclusion constraint entram no pacote 1.4.2.
       - Supabase criado (org `saude_plena`, sa-east-1, Postgres 17, Data API off). O
         "automatic RLS" veio ligado mesmo desmarcado: `ensure_rls` e
         `rls_auto_enable()` removidos à mão. CI/ZAP/backup alinhados ao 17.
+      - **Executado em 2026-11-03:** Render no ar (serviço `clinica-saude-plena`, Free,
+        Auto-Deploy "After CI Checks Pass", health check `/health`), domínio próprio da
+        parceira via CNAME no registro.br, revogações `anon`/`authenticated` aplicadas,
+        `backup_leitura` criado, backup diário verde (Backblaze B2 US East, bucket
+        privado, chave só escrita) e simulados A e B registrados. O Supabase gratuito
+        **pausa** sem uso (aconteceu antes do deploy); o backup diário passa a mantê-lo
+        ativo.
       - Pendente: quem guarda as chaves offline [a combinar com a parceira];
-        transferência internacional (Render fora do Brasil) no termo/relatório.
+        transferência internacional (Render fora do Brasil) no termo/relatório; a
+        parceira confirmar que aceita os dados na nuvem (o autor chegou a supor que
+        ficariam no PC dela) antes da conta dela; conta da parceira; lembretes (Brevo);
+        ZAP contra a URL de produção.
   - Cronograma de referência da EAP: desenvolvimento previsto 02/11 a 22/11/2026; testes e
     aceitação 23/11 a 29/11/2026; implantação 30/11 a 06/12/2026.
 
