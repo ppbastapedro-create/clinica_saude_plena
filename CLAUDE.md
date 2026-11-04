@@ -243,8 +243,8 @@ com a exclusion constraint entram no pacote 1.4.2.
       checklist); Dependabot. Correções: `body-parser` 2.4.0 (alta, DoS), ADMIN sem
       acesso clínico, CSP sem `unsafe-inline` + `frame-ancestors 'none'`,
       `Permissions-Policy`, `no-store` em toda a API, frontend do Projeto 3 **apagado**
-      (decisão do autor; `/` redireciona para `/login.html`). O `README.md` ainda
-      descreve o Projeto 3 — atualizar no 1.6.2 (manual).
+      (decisão do autor; `/` redireciona para `/login.html`). O `README.md` foi
+      reescrito para o Saúde Plena em 2026-11-04.
     - **1.5.3 Aceite (2026-10-27):** `docs/aceite/roteiro-aceitacao.md` (13 tarefas
       cobrindo o escopo, 3 cronometradas — meta < 1 min da EAP; tabela R1–R7 das regras
       pendentes com a parceira; avaliação 1–5) e `docs/aceite/termo-aceite-modelo.md`
@@ -286,11 +286,17 @@ com a exclusion constraint entram no pacote 1.4.2.
         privado, chave só escrita) e simulados A e B registrados. O Supabase gratuito
         **pausa** sem uso (aconteceu antes do deploy); o backup diário passa a mantê-lo
         ativo.
-      - Pendente: quem guarda as chaves offline [a combinar com a parceira];
-        transferência internacional (Render fora do Brasil) no termo/relatório; a
-        parceira confirmar que aceita os dados na nuvem (o autor chegou a supor que
-        ficariam no PC dela) antes da conta dela; conta da parceira; lembretes (Brevo);
-        ZAP contra a URL de produção.
+      - **Conta da parceira criada** (informado pelo autor em 2026-11-04).
+      - **2026-11-04:** passo a passo do Brevo e dos secrets em `docs/implantacao.md`
+        §7 (conta de preferência em nome da parceira, domínio autenticado com
+        DKIM/DMARC no registro.br, remetente neutro); workflow manual
+        `.github/workflows/seguranca-producao.yml` (ZAP baseline contra a URL
+        real, informada na hora, mesmo `.zap/rules.tsv`); `README.md` reescrito
+        para o Saúde Plena.
+      - Pendente (execução do autor): criar a conta Brevo e cadastrar os secrets;
+        rodar o ZAP de produção e triar o relatório; quem guarda as chaves offline
+        [a combinar com a parceira]; transferência internacional (Render fora do
+        Brasil e Brevo na UE) no termo/relatório; manual de uso da parceira (1.6.2).
   - Cronograma de referência da EAP: desenvolvimento previsto 02/11 a 22/11/2026; testes e
     aceitação 23/11 a 29/11/2026; implantação 30/11 a 06/12/2026.
 

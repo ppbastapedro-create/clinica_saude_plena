@@ -78,6 +78,7 @@ Como a verificação é feita:
 | Item | Nível | Situação |
 |---|---|---|
 | Primeira execução do ZAP | — | Roda no GitHub após o push. Cada alerta é triado: corrigido, ou aceito em `.zap/rules.tsv` com justificativa registrada aqui |
+| ZAP contra produção | — | Workflow manual `.github/workflows/seguranca-producao.yml` (baseline passivo na URL real: HTTPS, certificado, cabeçalhos do proxy do Render). A executar pelo autor; resultado registrado aqui |
 | `deepmerge-ts` via `prisma` (dev) | Alta, fora de produção | Aceito (ver A06); reavaliado no 1.6.1 |
 | Google Fonts | Baixo | O navegador da psicóloga contata o Google para baixar a fonte (expõe o IP). Alternativa: hospedar a fonte no próprio servidor |
 | Limite de login em memória | Baixo | Vale para uma instância (plano atual do Render); com várias, usar armazenamento compartilhado |

@@ -1,0 +1,71 @@
+name: Segurança (produção)
+
+# Varredura OWASP ZAP baseline contra o sistema NO AR (pacote 1.6.1,
+# conferência final do docs/implantacao.md). Complementa o seguranca.yml, que
+# varre um servidor descartável dentro do CI: aqui entram o que só existe em
+# produção — HTTPS e certificado do Render, domínio próprio, cabeçalhos que o
+# proxy do Render acrescenta ou remove.
+#
+# Só roda à mão (Actions → "Segurança (produção)" → Run workflow), informando
+# a URL. Não roda em push nem agendado: é o sistema real da parceira, e uma
+# varredura por mudança de código já é feita pelo seguranca.yml.
+#
+# O baseline é PASSIVO: navega pelas páginas públicas (login, termo de
+# consentimento, arquivos estáticos) e analisa as respostas. Não faz login,
+# não ataca, não grava nada no banco. O formulário de login não tem "action"
+# (o envio é por fetch), então o spider não chega a tentar /auth/login.
+#
+# Resultado: Actions → execução → Artifacts → "zap-producao". A triagem de
+# cada alerta vai para docs/seguranca-owasp.md; risco aceito, para
+# .zap/rules.tsv (o mesmo arquivo das duas varreduras).
+
+on:
+  workflow_dispatch:
+    inputs:
+      alvo:
+        description: 'URL de produção (ex.: https://seudominio.com.br)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  zap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ALVO: ${{ inputs.alvo }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confere a URL e acorda o servidor
+        # O Render gratuito dorme sem uso: a primeira requisição pode levar
+        # ~1 min. Sem esta espera o ZAP veria só erro de tempo esgotado.
+        run: |
+          case "$ALVO" in
+            https://*) ;;
+            *) echo "::error::Use a URL com https:// (produção só atende HTTPS)."; exit 1 ;;
+          esac
+          ALVO="${ALVO%/}"
+          echo "ALVO=$ALVO" >> "$GITHUB_ENV"
+          for i in $(seq 1 18); do
+            if curl -sf --max-time 10 "$ALVO/health" > /dev/null; then
+              echo "Servidor respondeu."
+              exit 0
+            fi
+            echo "Aguardando o servidor acordar ($i/18)..."
+            sleep 5
+          done
+          echo "::error::$ALVO/health não respondeu em 90 s."
+          exit 1
+
+      - name: OWASP ZAP (baseline)
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ env.ALVO }}/login.html
+          allow_issue_writing: false
+          artifact_name: zap-producao
+          rules_file_name: .zap/rules.tsv
+          # Mesma régua do seguranca.yml: qualquer alerta (até WARN) falha.
+          fail_action: true

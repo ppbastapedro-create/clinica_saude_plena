@@ -1,7 +1,23 @@
 node_modules/
+# Segredos: qualquer .env (raiz, backend/, .env.test, .env.production, cópias
+# como .env.local ou ".env - Copia"). Só os modelos, sem valores, entram no git.
 .env
-.env.test
+.env.*
+.env *
+!.env.example
+!.env.test.example
 .vscode/
+# Permissões pessoais do Claude Code (o settings.json, com as regras deny de
+# git, é do projeto e continua versionado).
+.claude/settings.local.json
+# npm install rodado na raiz por engano cria um lockfile vazio — o projeto
+# Node fica em backend/.
+/package-lock.json
+# Logs (ex.: servidor.log do workflow de segurança, npm-debug.log).
+*.log
+# Arquivos de sistema do Windows / OneDrive.
+Thumbs.db
+desktop.ini
 # Documentos com dados pessoais (termos assinados trazem nome, CPF e
 # assinatura) — nunca no repositório, que é público.
 *assinado*.pdf
