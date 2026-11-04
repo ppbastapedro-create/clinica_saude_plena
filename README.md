@@ -171,6 +171,33 @@ uma clínica multiprofissional fictícia, com dados em JSON e sem autenticação
 `backend/server.js` e o `backend/data/` ficam só como registro. Eles não rodam mais e os
 dados não foram migrados (eram só testes, de um modelo incompatível).
 
-## Autor
+## Como rodar localmente
 
-Pedro Paulo Basta
+Pré-requisitos: **Node.js 24** e um **PostgreSQL 16 ou mais recente**. Há três opções:
+
+- **Docker:** `docker compose up -d` na raiz sobe o Postgres 16 na porta **5433**, já com
+  os bancos `saude_plena` e `saude_plena_test`. Antes, copie `.env.example` para `.env`.
+- **Codespaces / devcontainer:** abra o repositório no Codespaces. O `post-create.sh`
+  instala tudo e gera os `.env`.
+- **Postgres instalado na máquina:** crie um usuário dono dos bancos `saude_plena` e
+  `saude_plena_test`, com permissão `CREATEDB` (o `prisma migrate dev` precisa dela para o
+  *shadow database*). Ajuste o `DATABASE_URL` do `backend/.env`.
+
+Os comandos `npm` rodam **dentro de `backend/`** (o `package.json` fica lá):
+
+```powershell
+cd backend
+npm install
+copy .env.example .env      # preencha SESSION_SECRET e REGISTRO_CHAVE_V1 (veja o próprio arquivo)
+npx prisma migrate dev      # cria as tabelas
+npm run db:seed             # dados FICTÍCIOS de demonstração
+npm run usuario:criar       # cria a conta de acesso (a senha é digitada no terminal)
+npm run dev                 # http://localhost:3000
+```
+
+Para gerar os dois segredos:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
