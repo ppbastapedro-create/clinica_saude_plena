@@ -103,6 +103,8 @@ describe('POST /pacientes', () => {
       telefone: '61999990000',
       valorSessao: null,
       receberLembrete: false,
+      tipoAtendimento: 'PARTICULAR', // padrão quando omitido
+      clinica: null,
       arquivadoEm: null,
       criadoEm: expect.any(String),
       consentimentoVigente: false,
@@ -189,6 +191,8 @@ describe('POST /pacientes', () => {
       telefone: null,
       valorSessao: null,
       receberLembrete: false,
+      tipoAtendimento: 'PARTICULAR',
+      clinica: null,
       arquivadoEm: null,
       criadoEm: expect.any(String),
       consentimentoVigente: false,
@@ -550,6 +554,7 @@ describe('GET /pacientes/:id/sessoes', () => {
       valor: null,
       cobrar: null,
       cobravel: false,
+      pagoPelaClinica: false,
       lembreteEnviadoEm: null,
       criadoEm: expect.any(String),
     });

@@ -10,6 +10,8 @@ const CAMPOS = {
   telefone: true,
   valorSessao: true,
   receberLembrete: true,
+  tipoAtendimento: true,
+  clinica: true,
   arquivadoEm: true,
   criadoEm: true,
   // Só para saber se há consentimento vigente (vira booleano no service).
@@ -56,6 +58,33 @@ async function atualizar(psicologoId, id, dados) {
   return prisma.paciente.update({ where: { id, psicologoId }, data: dados, select: CAMPOS });
 }
 
+// Edição do cadastro. Se o tipo de atendimento MUDOU, as sessões ainda
+// AGENDADO passam a seguir o tipo novo (quem vai pagar uma sessão que nem
+// aconteceu é quem paga agora); realizadas e faltas ficam como estavam — o
+// histórico do saldo não é reescrito. Só quando muda: corrigir o telefone
+// não pode desfazer um ajuste feito à mão numa sessão agendada.
+//
+// Na mesma transação, com a linha do paciente travada (FOR UPDATE): uma
+// marcação simultânea (FOR SHARE na mesma linha, ver agendamentos.repository)
+// espera e já lê o tipo novo.
+async function atualizarCadastro(psicologoId, id, dados) {
+  return prisma.$transaction(async (tx) => {
+    const [antes] = await tx.$queryRaw`
+      SELECT "tipoAtendimento"::text AS "tipoAtendimento" FROM "Paciente"
+      WHERE id = ${id} AND "psicologoId" = ${psicologoId}
+      FOR UPDATE`;
+    // Não existe / é de outra psicóloga: o update abaixo lança P2025 (404).
+    const paciente = await tx.paciente.update({ where: { id, psicologoId }, data: dados, select: CAMPOS });
+    if (antes && dados.tipoAtendimento && dados.tipoAtendimento !== antes.tipoAtendimento) {
+      await tx.agendamento.updateMany({
+        where: { pacienteId: id, psicologoId, status: 'AGENDADO' },
+        data: { pagoPelaClinica: dados.tipoAtendimento === 'CLINICA' },
+      });
+    }
+    return paciente;
+  });
+}
+
 // Arquiva só se não houver sessão AGENDADO futura (inicio > agora). Conferir
 // e arquivar acontecem na mesma transação, com a linha do paciente travada
 // (FOR UPDATE): uma marcação simultânea (que trava a mesma linha com FOR
@@ -91,4 +120,4 @@ async function arquivarSeSemSessoesFuturas(psicologoId, id, agora) {
   });
 }
 
-module.exports = { listar, buscarPorId, buscarPorCpf, criar, atualizar, arquivarSeSemSessoesFuturas };
+module.exports = { listar, buscarPorId, buscarPorCpf, criar, atualizar, atualizarCadastro, arquivarSeSemSessoesFuturas };

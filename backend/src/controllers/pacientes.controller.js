@@ -39,12 +39,23 @@ const pacienteSchema = z
     // Opt-in do lembrete por e-mail. Omitido = não (também no PUT, como os
     // demais campos opcionais).
     receberLembrete: z.boolean().default(false),
+    // Quem paga as sessões. Omitido = PARTICULAR (também no PUT).
+    tipoAtendimento: z.enum(['PARTICULAR', 'CLINICA'], 'Tipo de atendimento deve ser PARTICULAR ou CLINICA').default('PARTICULAR'),
+    // Nome da clínica ou do plano de saúde (só com CLINICA).
+    clinica: opcional(z.string().trim().max(120, 'Nome da clínica muito longo')),
   })
   // O banco também recusa (CHECK); aqui a mensagem sai no campo certo.
   .refine((p) => !p.receberLembrete || p.email, {
     path: ['receberLembrete'],
     message: 'Para receber lembrete, informe o e-mail do paciente',
-  });
+  })
+  .refine((p) => p.tipoAtendimento !== 'CLINICA' || p.clinica, {
+    path: ['clinica'],
+    message: 'Informe o nome da clínica ou do plano de saúde',
+  })
+  // Particular não guarda nome de clínica: se o formulário mandar um nome
+  // que sobrou de antes (trocou de clínica para particular), ele é apagado.
+  .transform((p) => (p.tipoAtendimento === 'PARTICULAR' ? { ...p, clinica: null } : p));
 
 const filtrosSchema = z.object({
   busca: z.string().trim().max(100).optional(),

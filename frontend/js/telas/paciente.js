@@ -45,6 +45,7 @@ function valorInicialDoCampo(nome, paciente) {
 function formularioPaciente(paciente, { textoBotao, aoSalvar, primario = false }) {
   const entradas = {};
   const errosCampo = {};
+  const rotulos = {};
   const mensagens = el('div', { class: 'mensagens' });
 
   const grupos = CAMPOS.map((c) => {
@@ -63,14 +64,66 @@ function formularioPaciente(paciente, { textoBotao, aoSalvar, primario = false }
     if (c.mascara) entrada.addEventListener('input', () => (entrada.value = c.mascara(entrada.value)));
     entradas[c.nome] = entrada;
     errosCampo[c.nome] = el('p', { class: 'erro-campo', id: `erro-${c.nome}`, hidden: true });
+    rotulos[c.nome] = el('span', {}, c.rotulo);
     return el(
       'div',
       { class: `grupo grupo-${c.nome}` },
-      el('label', { class: 'rotulo', for: entrada.id }, c.rotulo, c.obrigatorio ? '' : el('span', { class: 'opcional' }, ' (opcional)')),
+      el('label', { class: 'rotulo', for: entrada.id }, rotulos[c.nome], c.obrigatorio ? '' : el('span', { class: 'opcional' }, ' (opcional)')),
       c.moeda ? el('div', { class: 'campo-moeda' }, el('span', {}, 'R$'), entrada) : entrada,
       errosCampo[c.nome],
     );
   });
+
+  // Particular ou clínica/plano de saúde (pedido da parceira, 2026-11-05).
+  // Com clínica, a clínica paga as sessões: elas não entram no "a receber"
+  // do paciente, e o "preço da sessão" vira o valor que a clínica paga.
+  const campoTipo = el(
+    'select',
+    { class: 'campo', id: 'paciente-tipoAtendimento', name: 'tipoAtendimento' },
+    el('option', { value: 'PARTICULAR' }, 'Particular'),
+    el('option', { value: 'CLINICA' }, 'Clínica ou plano de saúde'),
+  );
+  campoTipo.value = paciente?.tipoAtendimento ?? 'PARTICULAR';
+  const campoClinica = el('input', {
+    class: 'campo',
+    id: 'paciente-clinica',
+    name: 'clinica',
+    type: 'text',
+    autocomplete: 'off',
+    maxlength: '120',
+    placeholder: 'Nome da clínica ou do plano',
+    value: paciente?.clinica ?? '',
+  });
+  entradas.tipoAtendimento = campoTipo;
+  entradas.clinica = campoClinica;
+  errosCampo.tipoAtendimento = el('p', { class: 'erro-campo', id: 'erro-tipoAtendimento', hidden: true });
+  errosCampo.clinica = el('p', { class: 'erro-campo', id: 'erro-clinica', hidden: true });
+  const grupoTipo = el(
+    'div',
+    { class: 'grupo grupo-tipoAtendimento' },
+    el('label', { class: 'rotulo', for: campoTipo.id }, 'Atendimento'),
+    campoTipo,
+    errosCampo.tipoAtendimento,
+  );
+  const grupoClinica = el(
+    'div',
+    { class: 'grupo grupo-clinica' },
+    el('label', { class: 'rotulo', for: campoClinica.id }, 'Clínica / plano'),
+    campoClinica,
+    el('p', { class: 'nota' }, 'As sessões deste paciente não entram no "a receber": quem paga é a clínica. Ao trocar o tipo, só as sessões ainda agendadas mudam.'),
+    errosCampo.clinica,
+  );
+  function mostrarTipo() {
+    const daClinica = campoTipo.value === 'CLINICA';
+    grupoClinica.hidden = !daClinica;
+    campoClinica.required = daClinica;
+    rotulos.valorSessao.textContent = daClinica ? 'Valor pago pela clínica por sessão' : 'Preço da sessão';
+  }
+  campoTipo.addEventListener('change', mostrarTipo);
+  mostrarTipo();
+  // Ordem na tela: dados pessoais, atendimento, clínica, preço.
+  const grupoValor = grupos.pop();
+  grupos.push(grupoTipo, grupoClinica, grupoValor);
 
   // Opt-in do lembrete por e-mail (pacote 1.4.8). É caixa de seleção: o que
   // vai para a API é `checked`, não `value` (ver o submit abaixo).
@@ -369,11 +422,29 @@ export async function montarFicha(raiz, ctx) {
       el('div', { class: 'acoes-status' }, botao('Registrar recebimento', { primario: true, icone: 'ok', type: 'submit' })),
     );
 
+    // Sessões pagas pela clínica/plano: só o total produzido (o repasse da
+    // clínica não é lançado aqui). Aparece para paciente de clínica e para
+    // quem já teve sessão da clínica (ex.: era de clínica e virou particular).
+    const { clinica } = conta;
+    const daClinica = conta.paciente.tipoAtendimento === 'CLINICA' || clinica.sessoes > 0 || clinica.sessoesSemValor > 0;
+    const blocoClinica =
+      daClinica &&
+      el(
+        'div',
+        { class: 'bloco-clinica' },
+        el('h3', {}, 'Pago pela clínica', conta.paciente.clinica && ` · ${conta.paciente.clinica}`),
+        linhaInfo(`Sessões realizadas (${clinica.sessoes})`, reais(clinica.total)),
+        clinica.sessoesSemValor > 0 &&
+          alerta('aviso', `${clinica.sessoesSemValor === 1 ? '1 sessão da clínica está' : `${clinica.sessoesSemValor} sessões da clínica estão`} sem valor e fora do total. Defina o valor na sessão.`),
+        el('p', { class: 'nota' }, 'Estas sessões não entram no "a receber" do paciente.'),
+      );
+
     const mensagem = avisoConta;
     avisoConta = null; // mostra uma vez só
     return cartao(
       { titulo: 'Conta do paciente', icone: 'cartao', extra: seloSaldo(conta.saldo), classe: 'cartao-conta' },
       mensagem,
+      blocoClinica,
       linhaInfo(`Sessões cobradas (${conta.sessoesCobradas})`, reais(conta.cobrado)),
       linhaInfo('Recebido', reais(conta.recebido)),
       conta.sessoesSemValor > 0 &&
@@ -410,6 +481,7 @@ export async function montarFicha(raiz, ctx) {
     const subtitulo = [
       arquivado ? `Arquivado em ${D.data(new Date(paciente.arquivadoEm))}` : `Em atendimento desde ${D.mesAno(desde).toLowerCase()}`,
       `${realizadas} ${realizadas === 1 ? 'sessão realizada' : 'sessões realizadas'}`,
+      paciente.tipoAtendimento === 'CLINICA' ? `Clínica: ${paciente.clinica}` : 'Particular',
     ].join(' · ');
 
     const { form } = formularioPaciente(paciente, {

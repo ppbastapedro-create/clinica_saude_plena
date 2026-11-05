@@ -99,6 +99,8 @@ export function cobrancaDaSessao(s) {
   if (s.status === 'CANCELADO') return el('span', { class: 'texto-suave' }, '—');
   if (fechada && !s.cobravel) return el('span', { class: 'celula-cobranca' }, s.valor ? reais(s.valor) : '', selo('Não cobrada', 'selo-cancelado'));
   if (s.cobravel && !s.valor) return selo('Sem valor', 'selo-falta');
+  // Paga pela clínica/plano: o valor não entra no "a receber" do paciente.
+  if (s.pagoPelaClinica) return el('span', { class: 'celula-cobranca' }, s.valor ? reais(s.valor) : '—', selo('Clínica', 'selo-agendado'));
   return el('span', {}, s.valor ? reais(s.valor) : '—');
 }
 

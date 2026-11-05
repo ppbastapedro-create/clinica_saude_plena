@@ -38,7 +38,11 @@ function paraResposta(ag) {
     temRegistro: Boolean(ag.registroSessao),
     valor: formatarValor(ag.valor),
     cobrar: ag.cobrar,
+    // `cobravel` = a sessão conta como sessão paga (regra pelo status +
+    // `cobrar`). `pagoPelaClinica` diz QUEM paga: com true, ela não vira
+    // débito do paciente — entra no total "pago pela clínica".
     cobravel: ehCobravel(ag),
+    pagoPelaClinica: ag.pagoPelaClinica,
     lembreteEnviadoEm: ag.lembreteEnviadoEm,
     criadoEm: ag.criadoEm,
   };

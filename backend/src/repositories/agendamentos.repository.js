@@ -85,15 +85,20 @@ async function criar({ psicologoId, pacienteId, inicio, fim }) {
 // pacientes.repository). Sem a trava, uma marcação poderia entrar entre a
 // conferência e o arquivamento. Devolve null se o paciente não puder receber
 // agendamento. `valor` (preço desta sessão) pode ser null.
+//
+// `pagoPelaClinica` sai do tipo de atendimento lido AQUI, com a linha
+// travada — não do que o service leu antes: se o cadastro mudou de tipo
+// nesse meio-tempo, vale o tipo novo.
 async function criarParaPacienteAtivo({ psicologoId, pacienteId, inicio, fim, valor }) {
   return prisma.$transaction(async (tx) => {
     const [paciente] = await tx.$queryRaw`
-      SELECT "arquivadoEm" FROM "Paciente"
+      SELECT "arquivadoEm", "tipoAtendimento"::text AS "tipoAtendimento" FROM "Paciente"
       WHERE id = ${pacienteId} AND "psicologoId" = ${psicologoId}
       FOR SHARE`;
     if (!paciente || paciente.arquivadoEm !== null) return null;
 
-    return tx.agendamento.create({ data: { psicologoId, pacienteId, inicio, fim, valor }, include: RELACOES });
+    const pagoPelaClinica = paciente.tipoAtendimento === 'CLINICA';
+    return tx.agendamento.create({ data: { psicologoId, pacienteId, inicio, fim, valor, pagoPelaClinica }, include: RELACOES });
   });
 }
 
@@ -120,10 +125,12 @@ const COBRAVEL = {
   ],
 };
 
+// Débitos da conta corrente: só o que o PACIENTE paga. Sessão paga pela
+// clínica/plano fica de fora do "a receber" (ver financeiro.service).
 async function somarCobraveisPorPaciente(psicologoId) {
   return prisma.agendamento.groupBy({
     by: ['pacienteId'],
-    where: { psicologoId, ...COBRAVEL },
+    where: { psicologoId, pagoPelaClinica: false, ...COBRAVEL },
     _sum: { valor: true },
     _count: { _all: true, valor: true }, // _count.valor conta só as que têm valor
   });

@@ -174,6 +174,26 @@ antigo (clínica multiprofissional). Pontos importantes do desenho:
     paciente (`GET /relatorios/saldos`), independente do mês.
   - Valores trafegam como texto com 2 casas (`"180.50"`) e são somados em centavos
     inteiros (ou pelo banco, em Decimal), nunca em float.
+- **Paciente particular × clínica/plano (pedido da parceira, 2026-11-05; migração
+  `20261105120000_tipo_atendimento_clinica`).** Não é integração com convênio (que
+  continua fora do escopo): só classificação e controle de valor.
+  - `Paciente.tipoAtendimento` (enum `PARTICULAR` | `CLINICA`, padrão `PARTICULAR`) e
+    `Paciente.clinica` (nome; CHECK `Paciente_clinica_conforme_tipo_check`: obrigatório
+    com `CLINICA`, `NULL` com `PARTICULAR`). Com `CLINICA`, `valorSessao` = quanto a
+    clínica paga por sessão.
+  - **A clínica paga**, então a sessão não entra no "a receber" do paciente.
+    `Agendamento.pagoPelaClinica` é copiado do tipo do paciente **ao marcar** (lido na
+    mesma transação com `FOR SHARE`), como o `valor`. Mudar o tipo do paciente
+    atualiza só as sessões `AGENDADO`, e só quando o tipo muda de fato
+    (`pacientes.repository.atualizarCadastro`, com `FOR UPDATE`). O histórico não é
+    reescrito. Ajuste por sessão em `PATCH /agendamentos/:id/cobranca`
+    (`pagoPelaClinica`).
+  - Débito do paciente = cobrável **e** `pagoPelaClinica = false` (extrato e
+    `somarCobraveisPorPaciente`). Cobrável **e** da clínica entra no bloco `clinica`
+    do extrato (`total`, `sessoes`, `sessoesSemValor`): só o total produzido. O
+    **repasse** da clínica **não é lançado** (decisão do autor).
+  - Relatório mensal **sem separação** particular × clínica (decisão do autor): as
+    sessões da clínica contam no "atendido". Pendente R8 no roteiro de aceite.
 - **Decisões de 2026-10-25:** área/login do paciente continua **fora do escopo**; a conta
   oficial da parceira é `PSICOLOGO` (dona de todos os dados dela), criada em
   **produção** no deploy com `npm run usuario:criar` (senha digitada por ela, nunca no
@@ -245,8 +265,9 @@ com a exclusion constraint entram no pacote 1.4.2.
       `Permissions-Policy`, `no-store` em toda a API, frontend do Projeto 3 **apagado**
       (decisão do autor; `/` redireciona para `/login.html`). O `README.md` foi
       reescrito para o Saúde Plena em 2026-11-04.
-    - **1.5.3 Aceite (2026-10-27):** `docs/aceite/roteiro-aceitacao.md` (13 tarefas
-      cobrindo o escopo, 3 cronometradas — meta < 1 min da EAP; tabela R1–R7 das regras
+    - **1.5.3 Aceite (2026-10-27):** `docs/aceite/roteiro-aceitacao.md` (15 tarefas
+      cobrindo o escopo — a 15ª, de paciente de clínica/plano, entrou em 2026-11-05 —,
+      3 cronometradas — meta < 1 min da EAP; tabela R1–R8 das regras
       pendentes com a parceira; avaliação 1–5) e `docs/aceite/termo-aceite-modelo.md`
       (sem dados pessoais; o assinado fica fora do git). O teste roda em
       **homologação** (notebook/ambiente separado, seed fictício), nunca em produção:

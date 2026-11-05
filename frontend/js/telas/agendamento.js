@@ -35,9 +35,19 @@ export async function montar(raiz, ctx) {
     await carregar();
   }
 
-  function cartaoCobranca(ag) {
+  function cartaoCobranca(ag, paciente) {
+    // Botão "quem paga" só aparece onde faz sentido: paciente de clínica, ou
+    // sessão que já está como paga pela clínica (para poder desfazer).
+    const temClinica = paciente.tipoAtendimento === 'CLINICA' || ag.pagoPelaClinica;
     const fechada = ag.status === 'REALIZADO' || ag.status === 'FALTA';
-    const situacao = ag.status === 'CANCELADO' || ag.status === 'AGENDADO' ? null : ag.cobravel ? selo('Entra na conta', 'selo-agendado') : selo('Não cobrada', 'selo-cancelado');
+    const situacao =
+      ag.status === 'CANCELADO' || ag.status === 'AGENDADO'
+        ? null
+        : !ag.cobravel
+          ? selo('Não cobrada', 'selo-cancelado')
+          : ag.pagoPelaClinica
+            ? selo('Paga pela clínica', 'selo-agendado')
+            : selo('Entra na conta', 'selo-agendado');
     const topo = { titulo: 'Cobrança', icone: 'cartao', extra: situacao };
     const linkConta = el('p', { class: 'nota' }, el('a', { href: `#/pacientes/${ag.paciente.id}` }, 'Ver a conta do paciente e lançar recebimentos'));
 
@@ -62,6 +72,14 @@ export async function montar(raiz, ctx) {
       salvarCobranca({ cobrar: novo === COBRA_POR_PADRAO[ag.status] ? null : novo }, novo ? 'A sessão entrou na conta do paciente.' : 'A sessão não será cobrada.');
     };
 
+    // Quem paga esta sessão: a clínica/plano ou o próprio paciente (ex.: a
+    // clínica não cobriu esta e o paciente pagou do bolso).
+    const trocarPagador = () =>
+      salvarCobranca(
+        { pagoPelaClinica: !ag.pagoPelaClinica },
+        ag.pagoPelaClinica ? 'Esta sessão passa a ser paga pelo paciente (entra na conta dele).' : 'Esta sessão passa a ser paga pela clínica (sai da conta do paciente).',
+      );
+
     return cartao(
       topo,
       mensagemCobranca,
@@ -77,15 +95,18 @@ export async function montar(raiz, ctx) {
         { class: 'acoes-status' },
         botao('Salvar valor', { onclick: () => salvarCobranca({ valor: campoValor.value.trim() || null }, 'Valor salvo.') }),
         fechada && botao(ag.cobravel ? 'Não cobrar esta sessão' : 'Cobrar esta sessão', { perigo: ag.cobravel, onclick: inverter }),
+        temClinica && botao(ag.pagoPelaClinica ? 'O paciente pagou esta' : 'A clínica paga esta', { onclick: trocarPagador }),
       ),
       el(
         'p',
         { class: 'nota' },
-        ag.status === 'AGENDADO'
-          ? 'Entra na conta do paciente quando for marcada como realizada.'
-          : ag.status === 'FALTA'
-            ? 'Falta não é cobrada automaticamente [regra a confirmar com a parceira]. Use "Cobrar esta sessão" se ela foi cobrada.'
-            : 'Realizada entra na conta do paciente. Use "Não cobrar" para cortesia ou acerto.',
+        ag.pagoPelaClinica
+          ? 'Sessão paga pela clínica/plano: não entra no "a receber" do paciente. O valor conta no total pago pela clínica, na ficha do paciente.'
+          : ag.status === 'AGENDADO'
+            ? 'Entra na conta do paciente quando for marcada como realizada.'
+            : ag.status === 'FALTA'
+              ? 'Falta não é cobrada automaticamente [regra a confirmar com a parceira]. Use "Cobrar esta sessão" se ela foi cobrada.'
+              : 'Realizada entra na conta do paciente. Use "Não cobrar" para cortesia ou acerto.',
       ),
       linkConta,
     );
@@ -206,7 +227,7 @@ export async function montar(raiz, ctx) {
         selo: seloStatus(ag.status),
         subtitulo: `${D.dataLonga(ag.inicio)} · ${D.intervalo(ag.inicio, ag.fim)}`,
       }),
-      el('div', { class: 'grade-cartoes' }, cartaoStatus, cartaoCobranca(ag), cartaoRegistro, cartaoLembrete(ag, paciente)),
+      el('div', { class: 'grade-cartoes' }, cartaoStatus, cartaoCobranca(ag, paciente), cartaoRegistro, cartaoLembrete(ag, paciente)),
     );
     mensagemCobranca = null; // mostra uma vez só
   }

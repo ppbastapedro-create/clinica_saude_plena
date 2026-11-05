@@ -12,6 +12,7 @@ const CONSTRAINTS_CONHECIDAS = [
   // requisições simultâneas passaram juntas pela checagem do service.
   { nome: 'Agendamento_sem_sobreposicao_excl', status: 409, erro: 'Horário ocupado por outra sessão.' },
   { nome: 'Agendamento_fim_maior_que_inicio_check', status: 422, erro: 'O fim da sessão deve ser depois do início.' },
+  { nome: 'Paciente_clinica_conforme_tipo_check', status: 422, erro: 'Paciente de clínica/plano precisa do nome da clínica; particular não tem clínica.' },
 ];
 
 function constraintConhecida(erro) {

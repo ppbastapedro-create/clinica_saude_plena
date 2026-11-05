@@ -60,7 +60,7 @@ async function criar(psicologoId, dados) {
 // Paciente arquivado pode ser editado: corrigir dados é direito do titular
 // (LGPD art. 18, III), inclusive depois do fim do acompanhamento.
 async function atualizar(psicologoId, id, dados) {
-  return comTratamentoDeErro(psicologoId, dados.cpf, () => pacientesRepository.atualizar(psicologoId, id, dados));
+  return comTratamentoDeErro(psicologoId, dados.cpf, () => pacientesRepository.atualizarCadastro(psicologoId, id, dados));
 }
 
 // Quantas datas a mensagem lista antes de resumir ("e mais N").

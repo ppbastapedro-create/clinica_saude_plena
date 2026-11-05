@@ -64,6 +64,15 @@ model Paciente {
   // ao marcar; a sessão guarda o próprio valor (mudar o preço não reescreve
   // o histórico).
   valorSessao     Decimal?        @db.Decimal(10, 2)
+  // Quem paga as sessões (pedido da parceira, 2026-11-05). CLINICA = paciente
+  // atendido por uma clínica ou plano de saúde que paga a psicóloga: as
+  // sessões dele não entram no "a receber" do paciente, e `valorSessao` passa
+  // a ser o valor que a clínica paga por sessão. `clinica` (nome da clínica
+  // ou do plano) é obrigatório com CLINICA e proibido com PARTICULAR (CHECK
+  // manual na migração). Não é integração com convênio (fora do escopo): só
+  // classificação e controle de valor.
+  tipoAtendimento TipoAtendimento @default(PARTICULAR)
+  clinica         String?
   // Lembrete de sessão por e-mail só com opt-in (padrão: não): um e-mail de
   // "lembrete de atendimento" numa caixa compartilhada pode expor que a pessoa
   // faz terapia. A psicóloga marca quando o paciente concordar. Exige e-mail
@@ -121,6 +130,12 @@ model Agendamento {
   // true/false = escolha explícita da psicóloga para esta sessão.
   valor             Decimal?          @db.Decimal(10, 2)
   cobrar            Boolean?
+  // Sessão paga pela clínica/plano (não pelo paciente): quando cobrável, não
+  // vira débito na conta do paciente — conta no total "pago pela clínica".
+  // Copiado do tipoAtendimento do paciente ao marcar (como o `valor`): mudar
+  // o tipo do paciente atualiza só as sessões ainda AGENDADO, nunca o
+  // histórico. Pode ser corrigido sessão a sessão (PATCH /:id/cobranca).
+  pagoPelaClinica   Boolean           @default(false)
   lembreteEnviadoEm DateTime?         @db.Timestamptz(3)
   registroSessao    RegistroSessao?
   logsAcesso        LogAcesso[]
@@ -150,6 +165,11 @@ model RegistroSessao {
 // parceira recebe por pacote (2 ou 4 sessões de uma vez, às vezes adiantado)
 // e por sessão avulsa. Saldo do paciente = recebimentos − sessões cobráveis.
 // Negativo = a receber; positivo = crédito (pacote pago e ainda não usado).
+enum TipoAtendimento {
+  PARTICULAR
+  CLINICA
+}
+
 enum FormaPagamento {
   PIX
   DINHEIRO

@@ -8,6 +8,8 @@ const { formatarValor, centavos, paraReais, somar } = require('../utils/dinheiro
 // Conta corrente do paciente (pacote 1.4.7, refeito em 2026-10-25).
 //
 //   DÉBITO  = cada sessão cobrável (ver agendamentos.service.ehCobravel)
+//             que o PACIENTE paga — a paga pela clínica/plano
+//             (pagoPelaClinica) fica fora do saldo, num total à parte
 //   CRÉDITO = cada recebimento não estornado
 //   SALDO   = créditos − débitos
 //
@@ -59,7 +61,10 @@ async function extrato(psicologoId, pacienteId) {
     agendamentosRepository.listarPorPaciente(psicologoId, pacienteId),
     recebimentosRepository.listarDoPaciente(psicologoId, pacienteId),
   ]);
-  const cobraveis = sessoes.map(sessaoParaResposta).filter((s) => s.cobravel);
+  const todasCobraveis = sessoes.map(sessaoParaResposta).filter((s) => s.cobravel);
+  // Paga pela clínica/plano: não é débito do paciente; vai para o total à parte.
+  const cobraveis = todasCobraveis.filter((s) => !s.pagoPelaClinica);
+  const daClinica = todasCobraveis.filter((s) => s.pagoPelaClinica);
   const comValor = cobraveis.filter((s) => s.valor !== null);
   const validos = recebimentos.filter((r) => !r.estornadoEm);
 
@@ -77,13 +82,28 @@ async function extrato(psicologoId, pacienteId) {
 
   const cobrado = somar(comValor.map((s) => s.valor));
   const recebido = somar(validos.map((r) => r.valor));
+  const daClinicaComValor = daClinica.filter((s) => s.valor !== null);
   return {
-    paciente: { id: paciente.id, nome: paciente.nome, valorSessao: formatarValor(paciente.valorSessao), arquivadoEm: paciente.arquivadoEm },
+    paciente: {
+      id: paciente.id,
+      nome: paciente.nome,
+      valorSessao: formatarValor(paciente.valorSessao),
+      tipoAtendimento: paciente.tipoAtendimento,
+      clinica: paciente.clinica,
+      arquivadoEm: paciente.arquivadoEm,
+    },
     cobrado: paraReais(cobrado),
     recebido: paraReais(recebido),
     saldo: paraReais(recebido - cobrado),
     sessoesCobradas: comValor.length,
     sessoesSemValor: cobraveis.length - comValor.length,
+    // Sessões pagas pela clínica/plano: só controle do valor produzido (o
+    // repasse da clínica não é lançado no sistema — decisão de 2026-11-05).
+    clinica: {
+      total: paraReais(somar(daClinicaComValor.map((s) => s.valor))),
+      sessoes: daClinicaComValor.length,
+      sessoesSemValor: daClinica.length - daClinicaComValor.length,
+    },
     lancamentos: lancamentos.reverse(), // mais recente primeiro, para a tela
   };
 }

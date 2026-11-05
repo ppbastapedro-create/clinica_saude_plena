@@ -1443,6 +1443,22 @@
   margin: 10px 0;
 }
 
+/* Sessões pagas pela clínica/plano: total à parte, fora do saldo. */
+.bloco-clinica {
+  margin-bottom: 16px;
+  padding: 14px;
+  background: var(--fundo);
+  border-radius: var(--raio);
+}
+
+.bloco-clinica .alerta {
+  margin: 10px 0;
+}
+
+.bloco-clinica .nota {
+  margin: 8px 0 0;
+}
+
 .form-recebimento {
   display: flex;
   flex-direction: column;

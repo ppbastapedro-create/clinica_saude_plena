@@ -320,3 +320,111 @@ describe('GET /relatorios/saldos (painel a receber / crédito)', () => {
     expect(body.pacientes.find((l) => l.paciente.id === arquivadoZerado.id)).toBeUndefined();
   });
 });
+
+// Paciente atendido por clínica ou plano de saúde (pedido da parceira,
+// 2026-11-05): a clínica paga a psicóloga, então as sessões dele não entram
+// no "a receber" — só no total "pago pela clínica".
+describe('paciente de clínica/plano de saúde', () => {
+  const marcar = (paciente, inicio) =>
+    agenteA.post('/agendamentos').send({ pacienteId: paciente.id, inicio: iso(inicio), fim: iso(inicio.replace(/:00$/, ':50')) });
+
+  test('cadastro: CLINICA exige o nome da clínica; PARTICULAR descarta o nome; tipo inválido dá 400', async () => {
+    const semNome = await agenteA.post('/pacientes').send({ nome: 'Paciente Clínica', cpf: CPFS[0], tipoAtendimento: 'CLINICA' });
+    expect(semNome.status).toBe(400);
+    expect(semNome.body.campos).toHaveProperty('clinica');
+
+    const comNome = await agenteA.post('/pacientes').send({ nome: 'Paciente Clínica', cpf: CPFS[0], tipoAtendimento: 'CLINICA', clinica: '  Clínica Fictícia  ', valorSessao: '60' });
+    expect(comNome.status).toBe(201);
+    expect(comNome.body).toMatchObject({ tipoAtendimento: 'CLINICA', clinica: 'Clínica Fictícia', valorSessao: '60.00' });
+
+    const particular = await agenteA.post('/pacientes').send({ nome: 'Paciente Particular', cpf: CPFS[1], tipoAtendimento: 'PARTICULAR', clinica: 'sobrou do formulário' });
+    expect(particular.status).toBe(201);
+    expect(particular.body).toMatchObject({ tipoAtendimento: 'PARTICULAR', clinica: null });
+
+    const invalido = await agenteA.post('/pacientes').send({ nome: 'Paciente X', cpf: CPFS[2], tipoAtendimento: 'CONVENIO' });
+    expect(invalido.status).toBe(400);
+    expect(invalido.body.campos).toHaveProperty('tipoAtendimento');
+  });
+
+  test('o banco também recusa CLINICA sem nome e PARTICULAR com nome (CHECK)', async () => {
+    await expect(criarPaciente(psiA, { tipoAtendimento: 'CLINICA' })).rejects.toThrow(/Paciente_clinica_conforme_tipo_check/);
+    await expect(criarPaciente(psiA, { tipoAtendimento: 'PARTICULAR', clinica: 'X' })).rejects.toThrow(/Paciente_clinica_conforme_tipo_check/);
+  });
+
+  test('sessão marcada para paciente de clínica: paga pela clínica, com o valor que a clínica paga', async () => {
+    const p = await criarPaciente(psiA, { tipoAtendimento: 'CLINICA', clinica: 'Plano Fictício', valorSessao: '60' });
+
+    const resposta = await marcar(p, '2031-05-05T09:00');
+
+    expect(resposta.status).toBe(201);
+    expect(resposta.body).toMatchObject({ pagoPelaClinica: true, valor: '60.00' });
+  });
+
+  test('extrato: sessões da clínica ficam fora do saldo e somam no total da clínica', async () => {
+    const p = await criarPaciente(psiA, { tipoAtendimento: 'CLINICA', clinica: 'Clínica Fictícia', valorSessao: '60' });
+    await sessao(psiA, p, '2020-03-02T09:00', 'REALIZADO', { valor: '60', pagoPelaClinica: true });
+    await sessao(psiA, p, '2020-03-09T09:00', 'REALIZADO', { valor: '60', pagoPelaClinica: true });
+    await sessao(psiA, p, '2020-03-16T09:00', 'FALTA', { valor: '60', pagoPelaClinica: true }); // falta: não conta (padrão)
+    await sessao(psiA, p, '2020-03-23T09:00', 'REALIZADO', { pagoPelaClinica: true }); // sem valor
+
+    const e = await extrato(agenteA, p);
+
+    expect(e).toMatchObject({ cobrado: '0.00', recebido: '0.00', saldo: '0.00', sessoesCobradas: 0, sessoesSemValor: 0 });
+    expect(e.clinica).toEqual({ total: '120.00', sessoes: 2, sessoesSemValor: 1 });
+    expect(e.paciente).toMatchObject({ tipoAtendimento: 'CLINICA', clinica: 'Clínica Fictícia' });
+    expect(e.lancamentos).toEqual([]);
+  });
+
+  test('virar paciente de clínica: só as sessões AGENDADO mudam; o histórico particular continua na conta', async () => {
+    const p = await criarPaciente(psiA, { nome: 'Paciente Mudou', valorSessao: '100' });
+    const antiga = await sessao(psiA, p, '2020-03-02T09:00', 'REALIZADO', { valor: '100' }); // pagou do bolso
+    const futura = await sessao(psiA, p, '2030-03-02T09:00', 'AGENDADO', { valor: '100' });
+
+    const put = await agenteA.put(`/pacientes/${p.id}`).send({ nome: p.nome, cpf: p.cpf, valorSessao: '60', tipoAtendimento: 'CLINICA', clinica: 'Clínica Fictícia' });
+    expect(put.status).toBe(200);
+
+    expect((await agenteA.get(`/agendamentos/${antiga.id}`)).body.pagoPelaClinica).toBe(false);
+    expect((await agenteA.get(`/agendamentos/${futura.id}`)).body.pagoPelaClinica).toBe(true);
+    // A dívida da sessão antiga não some.
+    expect((await extrato(agenteA, p)).saldo).toBe('-100.00');
+
+    // Voltar para particular desfaz nas agendadas.
+    await agenteA.put(`/pacientes/${p.id}`).send({ nome: p.nome, cpf: p.cpf, tipoAtendimento: 'PARTICULAR' });
+    expect((await agenteA.get(`/agendamentos/${futura.id}`)).body.pagoPelaClinica).toBe(false);
+  });
+
+  test('corrigir uma sessão: a clínica não cobriu, o paciente pagou (PATCH cobranca)', async () => {
+    const p = await criarPaciente(psiA, { tipoAtendimento: 'CLINICA', clinica: 'Clínica Fictícia' });
+    const s = await sessao(psiA, p, '2020-03-02T09:00', 'REALIZADO', { valor: '150', pagoPelaClinica: true });
+
+    const resposta = await agenteA.patch(`/agendamentos/${s.id}/cobranca`).send({ pagoPelaClinica: false });
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body).toMatchObject({ pagoPelaClinica: false, cobravel: true });
+    const e = await extrato(agenteA, p);
+    expect(e.saldo).toBe('-150.00');
+    expect(e.clinica.total).toBe('0.00');
+  });
+
+  test('editar o cadastro sem mudar o tipo não desfaz um ajuste feito à mão numa sessão agendada', async () => {
+    const p = await criarPaciente(psiA, { nome: 'Paciente Clínica', tipoAtendimento: 'CLINICA', clinica: 'Clínica Fictícia' });
+    const futura = await sessao(psiA, p, '2030-03-02T09:00', 'AGENDADO', { pagoPelaClinica: true });
+    await agenteA.patch(`/agendamentos/${futura.id}/cobranca`).send({ pagoPelaClinica: false }); // esta, o paciente paga
+
+    await agenteA.put(`/pacientes/${p.id}`).send({ nome: p.nome, cpf: p.cpf, telefone: '61999990000', tipoAtendimento: 'CLINICA', clinica: 'Clínica Fictícia' });
+
+    expect((await agenteA.get(`/agendamentos/${futura.id}`)).body.pagoPelaClinica).toBe(false);
+  });
+
+  test('painel de saldos: paciente de clínica não aparece como "a receber"', async () => {
+    const daClinica = await criarPaciente(psiA, { nome: 'Da Clínica (fictício)', tipoAtendimento: 'CLINICA', clinica: 'Clínica Fictícia' });
+    const particular = await criarPaciente(psiA, { nome: 'Particular (fictício)' });
+    await sessao(psiA, daClinica, '2020-03-02T09:00', 'REALIZADO', { valor: '60', pagoPelaClinica: true });
+    await sessao(psiA, particular, '2020-03-02T10:00', 'REALIZADO', { valor: '120' });
+
+    const { body } = await agenteA.get('/relatorios/saldos');
+
+    expect(body.totais.aReceber).toEqual({ total: '120.00', pacientes: 1 });
+    expect(body.pacientes.find((l) => l.paciente.id === daClinica.id)).toMatchObject({ saldo: '0.00', sessoesCobradas: 0 });
+  });
+});

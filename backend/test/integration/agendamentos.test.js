@@ -114,6 +114,7 @@ describe('POST /agendamentos (marcar)', () => {
       valor: null, // paciente sem preço padrão e sem valor no corpo
       cobrar: null,
       cobravel: false, // agendada ainda não entra na conta
+      pagoPelaClinica: false, // paciente particular
       lembreteEnviadoEm: null,
       criadoEm: expect.any(String),
     });

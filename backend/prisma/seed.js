@@ -100,6 +100,15 @@ async function main() {
     cpf: '36798214096',
     valorSessao: 100,
   });
+  // Atendida por clínica/plano (2026-11-05): a clínica paga, então a sessão
+  // dela não entra no "a receber"; valorSessao = quanto a clínica paga.
+  const lucia = await garantirPaciente(psicologa.id, {
+    nome: 'Lúcia Ramos (fictícia)',
+    cpf: '52998224725',
+    valorSessao: 60,
+    tipoAtendimento: 'CLINICA',
+    clinica: 'Clínica Exemplo (fictícia)',
+  });
 
   // Um agendamento de cada status, pra exercitar a agenda e os relatórios.
   const psicologoId = psicologa.id;
@@ -136,6 +145,15 @@ async function main() {
     status: 'FALTA',
     valor: 100,
   });
+  await garantirAgendamento({
+    psicologoId,
+    pacienteId: lucia.id,
+    inicio: new Date('2026-10-14T10:00:00-03:00'),
+    fim: new Date('2026-10-14T10:50:00-03:00'),
+    status: 'REALIZADO',
+    valor: 60,
+    pagoPelaClinica: true,
+  });
   // Mesmo horário do anterior (16:00–16:50) — prova que um agendamento
   // CANCELADO não conflita com a exclusion constraint.
   await garantirAgendamento({
@@ -148,7 +166,7 @@ async function main() {
 
   console.log('Seed concluído:', {
     usuaria: psicologa.email,
-    pacientes: [maria.nome, joao.nome, ana.nome],
+    pacientes: [maria.nome, joao.nome, ana.nome, lucia.nome],
     agendamentos: await prisma.agendamento.count({ where: { psicologoId } }),
   });
 }

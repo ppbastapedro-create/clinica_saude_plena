@@ -189,6 +189,18 @@ Deu certo? ( ) Sim ( ) Não — Observações: _________________________________
 
 Deu certo? ( ) Sim ( ) Não — Observações: ______________________________________
 
+### 15. Paciente de clínica ou plano de saúde
+*Escopo: pedido seu durante o projeto. Paciente particular ou de clínica/plano, com controle do valor que a clínica paga.*
+
+1. **Pacientes → Novo paciente**: *Paciente Teste Clínica*, CPF fictício, **Atendimento: Clínica ou plano de saúde**, nome da clínica, **Valor pago pela clínica por sessão** 60,00.
+2. Marque uma sessão para ele **ontem** e marque-a como **realizada**.
+3. Abra a ficha e veja o cartão **Conta do paciente**. Depois, menu **Financeiro** → lista de saldos.
+4. Abra a sessão e clique em **O paciente pagou esta**. Volte à ficha.
+
+**Esperado:** a sessão aparece com o selo **Clínica**, o bloco **Pago pela clínica** soma 60,00 e o paciente **não** aparece como "a receber". No passo 4, a sessão passa para a conta do paciente (60,00 a receber) e sai do total da clínica.
+
+Deu certo? ( ) Sim ( ) Não — Observações: ______________________________________
+
 ---
 
 ## Regras que dependem da sua decisão
@@ -206,6 +218,7 @@ mudar vira ajuste antes da implantação.
 | R5 | "Recebido no mês" deve contar pela data em que o dinheiro entrou? | Sim (como no seu caderno) | |
 | R6 | Sessões semanais fixas precisam ser marcadas de uma vez (repetição)? | Não existe; cada sessão é marcada separadamente | |
 | R7 | Alguma sessão pode passar de 4 horas? | Não — acima disso o sistema recusa (trava contra erro de digitação) | |
+| R8 | O pagamento que a clínica faz (repasse) precisa ser lançado no sistema? | Não: o sistema só soma o valor das sessões da clínica; o repasse fica fora. No relatório do mês, as sessões da clínica contam no "atendido" (não há separação particular × clínica) | |
 
 ## Pendências conhecidas (fora desta rodada)
 

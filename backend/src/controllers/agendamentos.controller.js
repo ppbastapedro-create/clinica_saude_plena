@@ -19,8 +19,14 @@ const cobrancaSchema = z
   .object({
     valor: valorSchema.nullable().optional(),
     cobrar: z.boolean('cobrar deve ser true, false ou null').nullable().optional(),
+    // Quem paga ESTA sessão (corrige uma sessão já fechada; ex.: a clínica
+    // não cobriu uma sessão e o paciente pagou do bolso).
+    pagoPelaClinica: z.boolean('pagoPelaClinica deve ser true ou false').optional(),
   })
-  .refine((d) => d.valor !== undefined || d.cobrar !== undefined, { message: 'Informe valor e/ou cobrar', path: ['valor'] });
+  .refine((d) => d.valor !== undefined || d.cobrar !== undefined || d.pagoPelaClinica !== undefined, {
+    message: 'Informe valor, cobrar e/ou pagoPelaClinica',
+    path: ['valor'],
+  });
 
 // Aceita os 4 status para que pedir "AGENDADO" responda 422 (transição não
 // permitida, regra de negócio) e não 400 (valor desconhecido).
