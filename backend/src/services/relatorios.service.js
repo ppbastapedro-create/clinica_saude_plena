@@ -3,6 +3,7 @@ const recebimentosRepository = require('../repositories/recebimentos.repository'
 const { paraResposta } = require('./agendamentos.service');
 const { recebimentoParaResposta } = require('./financeiro.service');
 const { paraReais, somar } = require('../utils/dinheiro');
+const { meiaNoiteNoFuso } = require('../utils/datas');
 
 // Relatório mensal (pacote 1.4.7): sessões do mês por status, quanto foi
 // atendido (cobrável) e quanto foi recebido.
@@ -17,11 +18,12 @@ const { paraReais, somar } = require('../utils/dinheiro');
 
 const totalizar = (valores) => ({ total: paraReais(somar(valores)), quantidade: valores.length });
 
-// Mês "AAAA-MM" no fuso da parceira. O env.js define process.env.TZ, então
-// new Date(ano, mes, 1) já é meia-noite em Brasília, mesmo com o servidor em UTC.
+// Mês "AAAA-MM" no fuso da parceira: de 00:00 do dia 1º (Brasília) até
+// 00:00 do dia 1º do mês seguinte, independente do fuso do servidor (ver
+// utils/datas.meiaNoiteNoFuso).
 function limitesDoMes(mes) {
   const [ano, numero] = mes.split('-').map(Number);
-  return { inicio: new Date(ano, numero - 1, 1), fim: new Date(ano, numero, 1) };
+  return { inicio: meiaNoiteNoFuso(ano, numero, 1), fim: meiaNoiteNoFuso(ano, numero + 1, 1) };
 }
 
 async function mensal(psicologoId, mes, agora = new Date()) {

@@ -122,6 +122,14 @@ antigo (clínica multiprofissional). Pontos importantes do desenho:
   entre psicólogos deve ser um processo explícito, nunca um cascade silencioso.
 - **Datas:** todos os `DateTime` são `@db.Timestamptz(3)` — precisão de milissegundos, igual
   ao `Date` do JavaScript, e instante absoluto independente do fuso do servidor.
+  No backend, **nunca** usar API de hora local (`new Date(ano, mes, dia)`, `getHours`,
+  `setHours`...): o resultado depende do fuso do processo. Usar `Intl` com `env.TZ`
+  (`utils/datas`: `meiaNoiteNoFuso`, formatadores). Motivo (2026-11-05): o relatório
+  mensal calculava o mês com `new Date(ano, mes, 1)`, o que passava no PC do autor
+  (Windows em Brasília) e falhava no CI (UTC), porque o `process.env.TZ` do `env.js`
+  não vale dentro do Jest. Em 05/11 o CI estava vermelho por isso (3 testes de
+  `relatorios.test.js`; vermelho desde 29/10, provavelmente pela mesma causa), e o
+  Auto-Deploy do Render ficou parado.
 - **Sem exclusão física:** `Paciente.arquivadoEm` (arquivamento lógico) substitui
   `DELETE /pacientes/:id`; não existe `DELETE /agendamentos/:id` — cancelar é
   `PATCH .../status` para `CANCELADO`. Motivo: guarda mínima de 5 anos (Resolução CFP
