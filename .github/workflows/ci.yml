@@ -63,7 +63,7 @@ jobs:
 
       # Relatório HTML da cobertura, baixável na página da execução
       # (Actions → execução → Artifacts). Evidência para o relatório de testes.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: cobertura
